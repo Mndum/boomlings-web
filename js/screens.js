@@ -636,6 +636,14 @@ export class ShareDialog extends ConfirmPurchase {
     return { text: 'You reached' + nl + '<cy>Level ' + this.level + '</c>', plain: 'I reached level ' + this.level + ' in Boomlings!' };
   }
   share() { const m = this.message().plain; try { navigator.clipboard.writeText(m); } catch (e) { /* no clipboard */ } this.app.toast('Copied', m); }
+  // 0 Facebook: its share page; 1 (the invite button): the phone's share sheet, else copy the text; 2 mail
+  shareVia(i, text) {
+    const site = location.origin + '/', open = (u) => { try { if (!window.open(u, '_blank', 'noopener')) location.href = u; } catch (e) { /* ignore */ } };
+    if (i === 0) open('https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(site) + '&quote=' + encodeURIComponent(text));
+    else if (i === 2) open('mailto:?subject=' + encodeURIComponent('Boomlings') + '&body=' + encodeURIComponent(text + ' ' + site));
+    else if (navigator.share) navigator.share({ title: 'Boomlings', text, url: site }).catch(() => {});
+    else this.share();
+  }
   drawBox(ctx, k) {
     const { ui, menu } = this.G, f = this.f, cx = 320, cy = 480, m = this.message();
     ctx.save(); ctx.translate(cx, cy); ctx.scale(k, k); ctx.translate(-cx, -cy);
@@ -652,7 +660,7 @@ export class ShareDialog extends ConfirmPurchase {
     [['facebookSBtn_001.png', 137.7], ['facebookReqSBtn_001.png', 320], ['mailSBtn_001.png', 502.3]].forEach(([n, x], i) => {
       const sh = sheet(n), [w, h] = sh.size(n), hx = (x - w / 2) * k + cx - cx * k, hy = (620 - h / 2) * k + cy - cy * k;
       this.pressed(ctx, hx, hy, w * k, h * k, x, 620, () => sh.draw(ctx, n, x, 620, {}));
-      this.hits.add(hx, hy, w * k, h * k, () => { if (i === 2) { try { window.open('mailto:?subject=Boomlings&body=' + encodeURIComponent(m.plain)); } catch (e) { /* ignore */ } } else this.share(); });
+      this.hits.add(hx, hy, w * k, h * k, () => this.shareVia(i, m.plain));
     });
     { const n = 'okBtn_001.png', sh = sheet(n), [w, h] = sh.size(n), hx = (500.3 - w / 2) * k + cx - cx * k, hy = (780.3 - h / 2) * k + cy - cy * k; this.pressed(ctx, hx, hy, w * k, h * k, 500.3, 780.3, () => sh.draw(ctx, n, 500.3, 780.3, {})); this.hits.add(hx, hy, w * k, h * k, () => this.app.back()); }
     ctx.restore();
