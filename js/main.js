@@ -20,12 +20,15 @@ const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const loadingEl = document.getElementById('loading');
 
+// fit the canvas to what is really visible (phones: URL bar showing/hiding, rotation, keyboard)
 function fit() {
-  const s = Math.min(window.innerWidth / W, window.innerHeight / CH);
+  const vv = window.visualViewport, w = Math.min(window.innerWidth, (vv && vv.width) || Infinity), h = Math.min(window.innerHeight, (vv && vv.height) || Infinity);
+  const s = Math.min(w / W, h / CH);
   canvas.style.width = Math.floor(W * s) + 'px';
   canvas.style.height = Math.floor(CH * s) + 'px';
 }
-window.addEventListener('resize', fit); fit();
+window.addEventListener('resize', fit); window.addEventListener('orientationchange', () => setTimeout(fit, 150)); fit();
+if (window.visualViewport) window.visualViewport.addEventListener('resize', fit);
 
 const G = { ctx, audio: new AudioMan('assets/'), onDeath: null };
 const SKIP_ITEM = { 5: 'kItemSkip', 10: 'kItemSkipB', 15: 'kItemSkipC' };
@@ -139,7 +142,7 @@ class App {
     const inp = document.createElement('input');
     inp.maxLength = 12; inp.value = G.save.d.name; inp.placeholder = 'Your name';
     const r = canvas.getBoundingClientRect();
-    inp.style.cssText = 'position:fixed;z-index:9;font:700 20px Helvetica,Arial,sans-serif;text-align:center;border:3px solid #fff;border-radius:10px;background:#0a3a8a;color:#fff;padding:8px;width:' + Math.min(260, r.width * 0.7) + 'px;left:' + (r.left + r.width / 2 - Math.min(260, r.width * 0.7) / 2 - 11) + 'px;top:' + (r.top + r.height * 0.45) + 'px';
+    inp.style.cssText = 'position:fixed;z-index:9;font:700 20px Helvetica,Arial,sans-serif;text-align:center;border:3px solid #fff;border-radius:10px;background:#0a3a8a;color:#fff;padding:8px;width:' + Math.min(260, r.width * 0.7) + 'px;left:' + (r.left + r.width / 2 - Math.min(260, r.width * 0.7) / 2 - 11) + 'px;top:' + (r.top + r.height * (matchMedia('(pointer: coarse)').matches ? 0.2 : 0.45)) + 'px';   /* higher on phones, above the keyboard */
     let fin = false; const done = (ok) => { if (fin) return; fin = true; if (ok && inp.value.trim()) { G.save.d.name = inp.value.trim().slice(0, 12); G.save.flush(); } inp.remove(); };
     inp.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') done(true); else if (e.key === 'Escape') done(false); });
     inp.addEventListener('blur', () => done(true));
@@ -262,16 +265,26 @@ function toCanvas(ev) {
   return [fx * W, fy * CH - OY];
 }
 let dragging = false;
+let activeId = null;   // one finger plays; a second finger is ignored so it cannot press a second button
 canvas.addEventListener('pointerdown', (ev) => {
-  ev.preventDefault(); dragging = true;
+  ev.preventDefault();
+  if (dragging && ev.pointerId !== activeId) return;
+  dragging = true; activeId = ev.pointerId;
+  try { canvas.setPointerCapture(ev.pointerId); } catch (e) { /* ignore */ }   // keep the drag when the finger slides off the canvas
+  G.audio.resume();   // iOS/Android suspend audio until (and after) a touch
   if (!G.audio.unlocked) { G.audio.unlock(); if (G.audio.musicOn) G.audio.playMusic('BoomlingsTitle.mp3', 0.5); }
   const top = app.top(); if (!top || app.fade) return;
   const [x, y] = toCanvas(ev); top.down(x, y);
 });
-canvas.addEventListener('pointermove', (ev) => { if (!dragging) return; const top = app.top(); if (top && top.move) { const [x, y] = toCanvas(ev); top.move(x, y); } });
-const endDrag = (ev) => { if (!dragging) return; dragging = false; const top = app.top(); if (top) { const [x, y] = toCanvas(ev); top.up(x, y); } };
+canvas.addEventListener('pointermove', (ev) => { if (!dragging || ev.pointerId !== activeId) return; const top = app.top(); if (top && top.move) { const [x, y] = toCanvas(ev); top.move(x, y); } });
+const endDrag = (ev) => { if (!dragging || ev.pointerId !== activeId) return; dragging = false; activeId = null; const top = app.top(); if (top) { const [x, y] = toCanvas(ev); top.up(x, y); } };
 canvas.addEventListener('pointerup', endDrag);
-canvas.addEventListener('pointercancel', () => { dragging = false; });
+canvas.addEventListener('pointercancel', () => { dragging = false; activeId = null; });
+// leaving the tab / app (phone call, app switch, screen off): pause a running game and silence the sound; coming back restores the sound
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { const top = app.top(); if (top instanceof PlayScreen) app.pause(); G.audio.suspend(); }
+  else G.audio.resume();
+});
 canvas.addEventListener('wheel', (ev) => { ev.preventDefault(); const top = app.top(); if (top && top.wheel) top.wheel(ev.deltaY); }, { passive: false });
 window.addEventListener('keydown', (ev) => {
   const top = app.top();

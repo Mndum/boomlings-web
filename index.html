@@ -3,9 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#0b1020">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Boomlings">
+<meta name="format-detection" content="telephone=no">
 <title>Boomlings</title>
 <style>
-  html, body { margin: 0; height: 100%; background: #0b1020; overflow: hidden; touch-action: none; }
+  html, body { margin: 0; height: 100%; background: #0b1020; overflow: hidden; touch-action: none; overscroll-behavior: none; -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; }
+  html { position: fixed; inset: 0; width: 100%; }   /* no pull-to-refresh / rubber-banding on phones */
+  @supports (height: 100dvh) { html, body { height: 100dvh; } }   /* the visible height, not the height behind the URL bar */
   body { display: flex; align-items: center; justify-content: center; font-family: sans-serif; }
   #game { display: block; image-rendering: auto; background: #0b1020; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-user-drag: none; }
   #loading { position: absolute; color: #ffd84a; font: 18px/1.4 sans-serif; text-align: center; }

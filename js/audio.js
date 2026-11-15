@@ -42,5 +42,8 @@ export class AudioMan {
     this.musicName = null;
   }
   setMusicOn(on) { this.musicOn = on; if (!on) this.stopMusic(); }
+  suspend() { if (this.ac && this.ac.state === 'running') this.ac.suspend().catch(() => {}); }
+  // phones suspend (or "interrupt") the audio context when the page loses focus; any touch wakes it again
+  resume() { if (this.unlocked && this.ac && this.ac.state !== 'running') this.ac.resume().catch(() => {}); }
   unlock() { this.unlocked = true; const ac = this.ctx(); if (ac && ac.state === 'suspended') ac.resume().catch(() => {}); }
 }
