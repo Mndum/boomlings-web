@@ -121,8 +121,8 @@ export class MenuScreen extends Screen {
     this.hits.add(560 - mg.width / 2, 853.333 - mg.height / 2, mg.width, mg.height, () => { try { window.open('https://www.geometrydash.com/games/', '_blank', 'noopener'); } catch (e) { /* popup blocked */ } });
     // the rate label slides 5 points right and back forever: CCRepeatForever(CCSequence(CCEaseInOut(CCMoveBy(1s, (5,0)), 2), its reverse)), starting from rateBtn.x - 54 = 236 (MenuLayer::init)
     { const ph = this.t % 2, u = ph < 1 ? ph : 2 - ph; menu.draw(ctx, 'rate_001.png', 2 * (236 + 5 * ease(u)), 953.333); }
-    // MenuLayer::onRate -> AppDelegate::openAppPage; the offline build's page-opener does nothing visible, so the button only presses
-    this.sprite(ctx, menu, 'rateBtn_001.png', 580, 953.333, 1, () => {});
+    // MenuLayer::onRate -> AppDelegate::openAppPage: here it opens this port's own rating page
+    this.sprite(ctx, menu, 'rateBtn_001.png', 580, 953.333, 1, () => { try { window.open(location.origin + '/rate/', '_blank', 'noopener'); } catch (e) { /* popup blocked */ } });
     const nm = this.G.save.d.name.toUpperCase().slice(0, 12);
     if (this.G.save.d.name !== 'Player') this.f.gold.draw(ctx, nm, 273 + menu.size('hello_001.png')[0] / 2 + 10, 976, { align: 'left', scale: 0.55 });
     this.hits.add(200, 940, 330, 70, () => this.app.rename());
