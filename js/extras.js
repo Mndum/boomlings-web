@@ -173,7 +173,7 @@ export class IconSelect extends SlidePanel {
         ctx.restore();
         if (!own) { ui.draw(ctx, 'lock_icon_001.png', x, y + 4, { scale: 0.62 }); f.gold.draw(ctx, String(ic.price), x - 8, y + 49, { scale: 0.45 }); this.coin(ctx, x + 24, y + 49, 26); }
       }
-      this.hits.add(x - 50, y - 50, 100, 100, () => { this.sel = ic; if (own) { d.icon = ic.id; save.flush(); } else if (!hidden(ic)) this.buy(ic); });
+      this.hits.add(x - 50, y - 50, 100, 100, () => { if (own) { this.sel = ic; d.icon = ic.id; save.flush(); } else this.buy(ic, hidden(ic)); });
     }
     if (pages > 1) {
       this.sprite(ctx, menu, 'shopArrowL_001.png', 29, 480, 1, () => { this.page = (this.page + pages - 1) % pages; });
@@ -182,10 +182,12 @@ export class IconSelect extends SlidePanel {
     f.gold.draw(ctx, String(save.gold), 581.7, -16.3, { align: 'right', scale: 0.93 }); this.coin(ctx, 611, -16.3, 49);
     this.endFrame(ctx);
   }
-  buy(ic) {
-    const { save, store } = this.G;
-    if (save.gold < ic.price) { this.app.dialog('Not enough Gold', 'Not enough <cy>Gold Coins</c>! You need <cy>' + (ic.price - save.gold) + '</c> more.', [['OK', null]]); return; }
-    this.app.dialog('Confirm Purchase', 'Purchase <cg>' + ic.title + '</c> for ' + ic.price + ' <cy>Gold Coins</c>?', [['CANCEL', null], ['OK', () => { const r = store.buyIcon(ic); if (r.ok) { this.G.audio.play('buyGold001.ogg', 0.8); save.d.icon = ic.id; save.flush(); } }]]);
+  // tapping a locked icon opens the detail popup (real game): buy it, or see which achievement unlocks it
+  buy(ic, hidden) {
+    const { save, store, ach } = this.G, nl = String.fromCharCode(10), a = ic.unlockedBy && ach.byId[ic.unlockedBy];
+    const item = { title: ic.title, boom: ic.index, price: ic.price, desc: (ic.desc || '').split(nl).join(' ') };
+    if (ic.unlockedBy) { Object.assign(item, { hidden: true, ach: a ? a.title : 'Achievement' }); if (hidden) item.sil = this.sil(ic.index); }
+    this.app.go(new this.app.Confirm(this.app, item, 'Buy', save.gold >= ic.price, () => { const r = store.buyIcon(ic); if (r.ok) { this.G.audio.play('buyGold001.ogg', 0.8); save.d.icon = ic.id; this.sel = ic; save.flush(); } }));
   }
 }
 

@@ -557,7 +557,18 @@ export class ConfirmPurchase extends Dialog {
     { const bm = menu.bitmap('shopTabBG_001.png'), sy = 1.18, cap = 70, dw = 490, dh = bm.height * sy, dx = 320 - dw / 2, dy = 180 - dh / 2;
       ctx.drawImage(bm, 0, 0, cap, bm.height, dx, dy, cap * sy, dh); ctx.drawImage(bm, cap, 0, bm.width - 2 * cap, bm.height, dx + cap * sy, dy, dw - 2 * cap * sy, dh); ctx.drawImage(bm, bm.width - cap, 0, cap, bm.height, dx + dw - cap * sy, dy, cap * sy, dh); }
     this.G.fonts.big.draw(ctx, it.title.toUpperCase(), 320, 190, { scale: Math.min(0.91, 400 / this.G.fonts.big.measure(it.title.toUpperCase(), 1)) });
-    { const [iw, ih] = ui.size(it.icon); ui.draw(ctx, it.icon, 320, 320, { scale: 144 / Math.max(iw, ih) }); }
+    if (it.sil) { ctx.drawImage(it.sil, 320 - it.sil.width * 0.5, 328 - it.sil.height * 0.5); ui.draw(ctx, 'questionMark_001.png', 320, 328, { scale: 0.9 }); }
+    else if (it.boom !== undefined) this.G.icons.draw(ctx, 'boomIcon_' + String(it.boom).padStart(2, '0') + '_001.png', 320, 328, { scale: 1.07 });
+    else { const [iw, ih] = ui.size(it.icon); ui.draw(ctx, it.icon, 320, 320, { scale: 144 / Math.max(iw, ih) }); }
+    if (it.hidden) {   // achievement-locked icon: no price, "Unlocked by Achievement <name>" and an OK check
+      ctx.fillStyle = '#04111d'; roundRect(ctx, 69.3, 440, 501.4, 220, 16); ctx.fill();
+      f.gold.draw(ctx, it.title, 320, 476, { scale: 0.8 });
+      richText(ctx, f.chat, it.desc, 82.7, 513, { scale: 1.0, maxWidth: 480, align: 'left', lineHeight: 40 });
+      f.gold.draw(ctx, 'Unlocked by Achievement', 320, 689, { scale: 0.6 }); f.gold.draw(ctx, it.ach, 320, 721, { scale: 0.7 });
+      this.hits.clear(); const n = 'okBtn_001.png', sh = menu.frames && menu.frames[n] ? menu : ui, [w, h] = sh.size(n), hx = (520 - w / 2) * k + cx - cx * k, hy = (780 - h / 2) * k + cy - cy * k;
+      this.pressed(ctx, hx, hy, w * k, h * k, 520, 780, () => sh.draw(ctx, n, 520, 780, {})); this.hits.add(hx, hy, w * k, h * k, () => this.app.back());
+      ctx.restore(); return;
+    }
     { const num = String(it.price), nw = f.gold.measure(num, 0.81), gx = 320 - (nw + 37.4) / 2 - 4; f.gold.draw(ctx, num, gx, 410, { align: 'left', scale: 0.81 }); this.coin(ctx, gx + nw + 18, 402, 50); }
     ctx.fillStyle = '#04111d'; roundRect(ctx, 69.3, 440, 501.4, 220, 16); ctx.fill();
     f.gold.draw(ctx, it.title, 320, 476, { scale: 0.8 });
