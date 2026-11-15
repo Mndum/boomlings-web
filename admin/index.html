@@ -350,6 +350,22 @@ const PRANKS = [
   ['tiny', '🔬', 'Tiny game', 'Shrunk to half size', 12], ['zoomies', '⚡', 'Zoomies', 'Super saturated', 10],
   ['sound', '🔔', 'Sound spam', 'Plays random game sounds', 8], ['fakegold', '🤑', 'Fake jackpot', '"+1,000,000 gold" ... just kidding', 0],
   ['toast', '🏆', 'Fake achievement', 'Pops an achievement banner', 0], ['message', '💬', 'Send message', 'Pop-up dialog with your text', 0],
+  ['shake', '🫨', 'Earthquake', 'Screen jitters and shakes', 10], ['bounce', '⛹️', 'Bouncy screen', 'The whole game bounces up and down', 10],
+  ['squish', '🥞', 'Pancake', 'Squashed flat', 12], ['ghost', '👻', 'Ghost mode', 'Game turns see-through', 12],
+  ['flicker', '💡', 'Power cut', 'Lights flicker on and off', 10], ['drunk', '🍺', 'Drunk', 'Blurry and swaying', 12],
+  ['nightmare', '😈', 'Nightmare', 'Inverted, twisted colours', 10], ['emojirain', '🤡', 'Emoji rain', 'Clowns, bananas and bombs fall over the game', 8],
+  ['speak', '🗣️', 'Speak aloud', 'Their device reads your text out loud', 0], ['vibrate', '📳', 'Buzz phone', 'Vibrates (phones only)', 6],
+  ['chipmunk', '🐿️', 'Chipmunk music', 'Music at double speed', 15], ['slowmo', '🐌', 'Slow-mo music', 'Music drags at half speed', 15],
+  ['fakecrash', '💥', 'Fake crash', '"Boomlings has stopped" box (harmless)', 8], ['fakeupdate', '⬇️', 'Fake update', 'Stuck on "Installing update 99%"', 10],
+  ['fakeban', '🔨', 'Fake ban', 'Says they are banned ... then "just kidding"', 0],
+  ['shake', '🫨', 'Earthquake', 'Screen jitters and shakes', 10], ['bounce', '⛹️', 'Bouncy screen', 'The whole game bounces up and down', 10],
+  ['squish', '🥞', 'Pancake', 'Squashed flat', 12], ['ghost', '👻', 'Ghost mode', 'Game turns see-through', 12],
+  ['flicker', '💡', 'Power cut', 'Lights flicker on and off', 10], ['drunk', '🍺', 'Drunk', 'Blurry and swaying', 12],
+  ['nightmare', '😈', 'Nightmare', 'Inverted, twisted colours', 10], ['emojirain', '🤡', 'Emoji rain', 'Clowns, bananas and bombs fall over the game', 8],
+  ['speak', '🗣️', 'Speak aloud', 'Their device reads your text out loud', 0], ['vibrate', '📳', 'Buzz phone', 'Vibrates (phones only)', 6],
+  ['chipmunk', '🐿️', 'Chipmunk music', 'Music at double speed', 15], ['slowmo', '🐌', 'Slow-mo music', 'Music drags at half speed', 15],
+  ['fakecrash', '💥', 'Fake crash', '"Boomlings has stopped" box (harmless)', 8], ['fakeupdate', '⬇️', 'Fake update', 'Stuck on "Installing update 99%"', 10],
+  ['fakeban', '🔨', 'Fake ban', 'Says they are banned ... then "just kidding"', 0],
 ];
 let liveWS = null, liveClosing = false, liveFrames = 0;
 function liveStop() { liveClosing = true; clearInterval(liveTimer); if (liveWS) { try { liveWS.close(); } catch (e) { /* ignore */ } liveWS = null; } }
@@ -376,6 +392,8 @@ async function live() {
     v.querySelectorAll('.pranks .btn').forEach((b) => b.onclick = async () => {
       const q = PRANKS.find((x) => x[0] === b.dataset.k), msg = { t: 'prank', id: liveAll ? 'all' : liveSel, type: q[0], secs: q[4] };
       if (q[0] === 'message') { const r = await dialog({ title: 'Send a pop-up', fields: [{ label: 'Title (40 max)', value: 'Hello!' }, { label: 'Message (140 max)', value: 'I can see you...' }], ok: 'Send it' }); if (!r) return; msg.text = r[0]; msg.text2 = r[1]; }
+      if (q[0] === 'speak') { const r = await dialog({ title: 'Say something', fields: [{ label: 'Text to read aloud (140 max)', value: 'I can see you playing' }], ok: 'Send it' }); if (!r) return; msg.text2 = r[0]; }
+      if (q[0] === 'speak') { const r = await dialog({ title: 'Say something', fields: [{ label: 'Text to read aloud (140 max)', value: 'I can see you playing' }], ok: 'Send it' }); if (!r) return; msg.text2 = r[0]; }
       if (q[0] === 'toast') { const r = await dialog({ title: 'Fake achievement', fields: [{ label: 'Title', value: 'Achievement unlocked!' }, { label: 'Subtitle', value: 'Stared at the screen' }], ok: 'Send it' }); if (!r) return; msg.text = r[0]; msg.text2 = r[1]; }
       if (liveWS && liveWS.readyState === 1) liveWS.send(JSON.stringify(msg)); else toast('Not connected');
     });

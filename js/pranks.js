@@ -52,6 +52,13 @@ export class Pranks {
       case 'message': this.app.dialog(TXT(p.text, 40) || 'Hello!', TXT(p.text2, 140) || 'Somebody is watching you...', [['OK', null]]); return;
       case 'toast': this.app.toast(TXT(p.text, 30) || 'Surprise!', TXT(p.text2, 40) || 'Hee hee', 'getAch001.ogg'); return;
       case 'sound': { let n = 0; const t = setInterval(() => { this.G.audio.play(['click08.ogg', 'getAch001.ogg', 'unlock004.ogg', 'highscoreGet02.ogg'][n++ % 4], 0.6); if (n >= secs) clearInterval(t); }, 1000); return; }
+      case 'speak': try { const u = new SpeechSynthesisUtterance(TXT(p.text2, 140) || 'Hello there'); u.rate = 0.95; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch (e) { /* no speech on this device */ } return;
+      case 'vibrate': try { if (navigator.vibrate) navigator.vibrate(Array.from({ length: secs * 2 }, (_, i) => (i % 2 ? 150 : 250))); } catch (e) { /* ignore */ } return;
+      case 'chipmunk': case 'slowmo': this.musicRate(p.type === 'chipmunk' ? 2 : 0.5, secs); return;
+      case 'emojirain': this.emojiRain(secs); return;
+      case 'fakecrash': this.overlay('<div style="background:#2b2b2b;color:#eee;border-radius:14px;padding:20px;width:min(80vw,300px);font:16px/1.4 sans-serif;box-shadow:0 8px 30px #000a"><b style="font-size:19px">Boomlings has stopped</b><p style="margin:10px 0 18px;opacity:.8">The app keeps crashing. Do you want to close it?</p><div style="text-align:right;color:#6cf;font-weight:700"><span data-x style="margin-right:22px;cursor:pointer">WAIT</span><span data-x style="cursor:pointer">CLOSE APP</span></div></div>', secs, 'rgba(0,0,0,.55)', true); return;
+      case 'fakeupdate': this.overlay('<div style="text-align:center;color:#fff;font:700 20px/1.6 sans-serif"><div style="font-size:46px">⚙️</div>Installing update<br><div style="margin:14px auto;width:min(70vw,260px);height:14px;border:2px solid #fff;border-radius:9px;overflow:hidden"><div style="width:99%;height:100%;background:#4c8"></div></div><span style="font-size:16px;opacity:.8">99% - please do not close the game</span></div>', secs, '#0b1020', false); return;
+      case 'fakeban': this.app.dialog('Account suspended', 'Your account was banned for being too good at Boomlings. Contact support.', [['OK', null]]); setTimeout(() => this.app.toast('Just kidding :)', 'You are not banned', 'getAch001.ogg'), 7000); return;
       case 'fakegold': this.app.toast('+1,000,000 gold!', 'Just kidding :)', 'buyGold001.ogg'); return;
       default: this.fx[p.type] = end; this.apply(); setTimeout(() => this.apply(), secs * 1000 + 60);
     }
@@ -72,12 +79,55 @@ export class Pranks {
     if (on('sepia')) fl.push('sepia(1) saturate(2)');
     if (on('blur')) fl.push('blur(3px)');
     if (on('zoomies')) fl.push('saturate(3) contrast(1.4)');
-    const s = this.canvas.style; s.transform = tr.join(' '); s.filter = fl.join(' ');
+    if (on('shake')) tr.push('translate(var(--tx, 0px), var(--ty, 0px))');
+    if (on('bounce')) tr.push('translateY(var(--by, 0px))');
+    if (on('squish')) tr.push('scaleY(0.5)');
+    if (on('drunk')) { tr.push('rotate(var(--dr, 0deg))'); fl.push('blur(var(--bl, 0px))'); }
+    if (on('flicker')) fl.push('brightness(var(--br, 1))');
+    if (on('nightmare')) fl.push('invert(1) hue-rotate(160deg) contrast(1.3)');
+    const s = this.canvas.style; s.transform = tr.join(' '); s.filter = fl.join(' '); s.opacity = on('ghost') ? '0.3' : '';
     clearInterval(this.anim);
-    if (on('wobble') || on('rainbow')) this.anim = setInterval(() => {
-      const x = performance.now() / 1000; s.setProperty('--wob', Math.sin(x * 3) * 6 + 'deg'); s.setProperty('--hue', (x * 180) % 360 + 'deg');
-      if (!on('wobble') && !on('rainbow')) { clearInterval(this.anim); this.apply(); }
-    }, 50);
+    const moving = ['wobble', 'rainbow', 'shake', 'bounce', 'drunk', 'flicker'];
+    if (moving.some(on)) this.anim = setInterval(() => {
+      const x = performance.now() / 1000;
+      s.setProperty('--wob', Math.sin(x * 3) * 6 + 'deg'); s.setProperty('--hue', (x * 180) % 360 + 'deg');
+      s.setProperty('--tx', (Math.random() * 20 - 10) + 'px'); s.setProperty('--ty', (Math.random() * 20 - 10) + 'px');
+      s.setProperty('--by', -Math.abs(Math.sin(x * 5)) * 70 + 'px');
+      s.setProperty('--dr', Math.sin(x * 1.3) * 3 + 'deg'); s.setProperty('--bl', (Math.sin(x * 2) + 1) * 2 + 'px');
+      s.setProperty('--br', Math.random() < 0.35 ? '0.08' : '1');
+      if (!moving.some(on)) { clearInterval(this.anim); this.apply(); }
+    }, 60);
+  }
+  // a fixed layer over the whole page for a fake system box; auto-removed (tapping a data-x button closes it early with a wink)
+  overlay(html, secs, bg, closable) {
+    const d = document.createElement('div');
+    d.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:40;display:flex;align-items:center;justify-content:center;background:' + bg;
+    d.innerHTML = html; document.body.appendChild(d);
+    const end = () => { if (d.parentNode) { d.remove(); this.app.toast('Just kidding :)', 'Nothing is wrong', 'getAch001.ogg'); } };
+    if (closable) d.querySelectorAll('[data-x]').forEach((b) => b.addEventListener('click', end));
+    setTimeout(end, secs * 1000);
+  }
+  // falling emojis drawn on a pointer-transparent layer, for `secs` seconds
+  emojiRain(secs) {
+    const c = document.createElement('canvas'), W = (c.width = innerWidth), H = (c.height = innerHeight), x = c.getContext('2d');
+    c.style.cssText = 'position:fixed;top:0;left:0;z-index:39;pointer-events:none';
+    document.body.appendChild(c);
+    const E = ['🤡', '🍌', '💣', '🐔', '💩', '🔥', '👀', '🧀'], drops = Array.from({ length: 45 }, () => ({ x: Math.random() * W, y: -Math.random() * H, v: 2 + Math.random() * 5, e: E[(Math.random() * E.length) | 0], s: 24 + Math.random() * 28 }));
+    const end = performance.now() + secs * 1000;
+    const step = () => {
+      x.clearRect(0, 0, W, H);
+      for (const d of drops) { d.y += d.v; if (d.y > H + 40) { d.y = -40; d.x = Math.random() * W; } x.font = d.s + 'px serif'; x.fillText(d.e, d.x, d.y); }
+      if (performance.now() < end) requestAnimationFrame(step); else c.remove();
+    };
+    requestAnimationFrame(step);
+  }
+  // music speed (1 = normal) for a while; re-applied twice a second in case the track restarts
+  musicRate(rate, secs) {
+    const au = this.G.audio, end = performance.now() + secs * 1000;
+    const set = (r) => { try { if (au.music && au.music.s) au.music.s.playbackRate.value = r; } catch (e) { /* ignore */ } };
+    clearInterval(this.rateTimer);
+    this.rateTimer = setInterval(() => { if (performance.now() >= end) { clearInterval(this.rateTimer); set(1); } else set(rate); }, 500);
+    set(rate);
   }
   // map a point on the (possibly flipped) canvas element back to game space
   fix(fx, fy) { if (this.flipY) { fx = 1 - fx; fy = 1 - fy; } if (this.flipX) fx = 1 - fx; return [fx, fy]; }

@@ -4,7 +4,7 @@
 // Sockets hibernate between messages, so an idle room costs nothing. Roles are decided by the Worker (it checks the tokens).
 import { DurableObject } from 'cloudflare:workers';
 
-const PRANKS = new Set(['message', 'toast', 'sound', 'fakegold', 'flip', 'mirror', 'tiny', 'wobble', 'rainbow', 'invert', 'gray', 'sepia', 'blur', 'zoomies']);
+const PRANKS = new Set(['message', 'toast', 'sound', 'fakegold', 'flip', 'mirror', 'tiny', 'wobble', 'rainbow', 'invert', 'gray', 'sepia', 'blur', 'zoomies', 'shake', 'bounce', 'squish', 'ghost', 'flicker', 'drunk', 'nightmare', 'emojirain', 'speak', 'vibrate', 'chipmunk', 'slowmo', 'fakecrash', 'fakeupdate', 'fakeban']);
 const send = (ws, o) => { try { ws.send(typeof o === 'string' ? o : JSON.stringify(o)); } catch (e) { /* socket already closed */ } };
 
 export class Hub extends DurableObject {
