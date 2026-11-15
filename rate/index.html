@@ -5,22 +5,32 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Rate Boomlings</title>
 <meta name="description" content="Rate this fan-made browser port of Boomlings and leave feedback.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&display=swap">
 <style>
+  /* drop the real font next to this page as rate/pusab.ttf (or .otf/.woff2) and it is used automatically */
+  @font-face { font-family:'Pusab'; src:url('pusab.woff2') format('woff2'), url('pusab.ttf') format('truetype'), url('pusab.otf') format('opentype'); font-display:swap; }
   :root { --bg:#0d1b33; --card:#14264a; --line:#243a66; --ink:#eef3fb; --mute:#9db0cf; --star:#f5b301; --brand:#2f7fe6; }
   * { box-sizing:border-box; }
   html,body { margin:0; min-height:100%; }
-  body { background:var(--bg); color:var(--ink); font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; padding:28px 16px 56px; }
-  main { max-width:520px; margin:0 auto; }
+  body { background:#1a63bd; color:var(--ink); font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; padding:28px 16px 56px; }
+  .pu, h1, h2, .big b, .send, .stars button, label, .bar b { font-family:'Pusab','Lilita One','Arial Rounded MT Bold',system-ui,sans-serif; font-weight:400; letter-spacing:.3px; }
+  /* checkerboard sliding diagonally, one tile per loop so it never jumps */
+  body::before { content:''; position:fixed; inset:0; z-index:-1; background:conic-gradient(#2a7de1 25%, #1f6bcb 0 50%, #2a7de1 0 75%, #1f6bcb 0) 0 0 / 96px 96px; animation:slide 4s linear infinite; }
+  @keyframes slide { to { background-position:96px 96px; } }
+  @media (prefers-reduced-motion: reduce) { body::before { animation:none; } }
+  main { max-width:520px; margin:0 auto; position:relative; }
   header { display:flex; align-items:center; gap:14px; margin-bottom:6px; }
-  header img { height:44px; width:auto; }
-  h1 { font-size:22px; margin:0; font-weight:700; }
-  .lead { color:var(--mute); margin:6px 0 22px; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px; margin-bottom:16px; }
-  h2 { font-size:15px; margin:0 0 12px; font-weight:650; color:var(--mute); text-transform:uppercase; letter-spacing:.05em; }
+  header { flex-wrap:wrap; }
+  header img { height:56px; width:auto; }
+  h1 { font-size:34px; line-height:1.05; margin:0; color:#fff; -webkit-text-stroke:5px #000; paint-order:stroke fill; text-shadow:0 4px 0 rgba(0,0,0,.35); }
+  .lead { color:#fff; margin:8px 0 20px; font-weight:600; text-shadow:0 2px 0 rgba(0,0,0,.45); }
+  .card { background:#0f2a5c; border:4px solid #000; border-radius:16px; padding:18px; margin-bottom:18px; box-shadow:0 6px 0 rgba(0,0,0,.3); }
+  h2 { font-size:22px; margin:0 0 12px; color:#ffd23f; text-shadow:0 3px 0 #000; }
 
   .sum { display:flex; gap:20px; align-items:center; flex-wrap:wrap; }
   .big { text-align:center; min-width:90px; }
-  .big b { display:block; font-size:44px; line-height:1; font-weight:700; }
+  .big b { display:block; font-size:58px; line-height:1; color:#fff; -webkit-text-stroke:4px #000; paint-order:stroke fill; }
   .big .st { color:var(--star); letter-spacing:2px; margin:4px 0 2px; }
   .big small { color:var(--mute); }
   .bars { flex:1; min-width:180px; }
@@ -31,16 +41,18 @@
   .bar span { width:24px; text-align:right; }
 
   .stars { display:flex; gap:4px; margin:0 0 14px; }
-  .stars button { background:none; border:0; padding:0 2px; font-size:40px; line-height:1; color:#3a4f7a; cursor:pointer; }
+  .stars button { background:none; border:0; padding:0 2px; font-size:48px; line-height:1; color:#3a4f7a; cursor:pointer; -webkit-text-stroke:3px #000; paint-order:stroke fill; transition:transform .1s; }
+  .stars button:hover { transform:scale(1.15); }
   .stars button.on { color:var(--star); }
   .stars button:hover { color:var(--star); }
-  label { display:block; font-size:14px; color:var(--mute); margin:12px 0 4px; }
-  input,textarea { width:100%; padding:10px 12px; font:inherit; color:var(--ink); background:#0d1b33; border:1px solid var(--line); border-radius:8px; outline:0; }
-  input:focus,textarea:focus { border-color:var(--brand); }
+  label { display:block; font-size:17px; color:#ffd23f; margin:14px 0 4px; text-shadow:0 2px 0 #000; }
+  input,textarea { width:100%; padding:10px 12px; font:inherit; color:var(--ink); background:#081a3d; border:3px solid #fff; border-radius:10px; outline:0; }
+  input:focus,textarea:focus { border-color:#ffd23f; }
   textarea { min-height:90px; resize:vertical; }
-  button.send { margin-top:16px; padding:11px 20px; font:inherit; font-weight:650; color:#fff; background:var(--brand); border:0; border-radius:8px; cursor:pointer; }
+  button.send { margin-top:18px; padding:12px 28px; font-size:24px; color:#fff; background:linear-gradient(#5be36a,#21a437); border:4px solid #000; border-radius:12px; cursor:pointer; -webkit-text-stroke:3px #000; paint-order:stroke fill; box-shadow:0 5px 0 rgba(0,0,0,.4); }
+  button.send:active { transform:translateY(3px); box-shadow:0 2px 0 rgba(0,0,0,.4); }
   button.send:hover { filter:brightness(1.1); }
-  button.send:disabled { background:#34486f; color:#8fa1c2; cursor:default; filter:none; }
+  button.send:disabled { background:#5b6f94; cursor:default; filter:none; transform:none; }
   .msg { display:inline-block; margin-left:12px; font-size:14px; }
   .msg.ok { color:#5fd38d; } .msg.err { color:#ff8a80; }
 
@@ -50,8 +62,8 @@
   .rev .w { color:var(--mute); font-size:13px; }
   .rev p { margin:4px 0 0; white-space:pre-wrap; overflow-wrap:anywhere; }
   .empty { color:var(--mute); }
-  footer { color:var(--mute); font-size:13px; margin-top:8px; }
-  footer a { color:var(--brand); }
+  footer { color:#fff; font-size:13px; margin-top:8px; text-shadow:0 2px 0 rgba(0,0,0,.55); font-weight:600; }
+  footer a { color:#ffd23f; }
 </style>
 </head>
 <body>
