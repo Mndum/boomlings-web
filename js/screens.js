@@ -86,13 +86,14 @@ export class MenuScreen extends Screen {
     this.hits.clear();
     menu.draw(ctx, 'MainMenuBG_001.png', W / 2, H / 2, { scale: CH / H });
     if (this.G.fx) this.G.fx.draw(ctx, 'menu'); // glitter sits behind the logo
-    menu.draw(ctx, 'boomlingslogo.png', 320, 66.3);
-    // vertical menu: Play / Store / Extras / Free Gold, left edge at x=120, padding 20 * (320/480)
+    menu.draw(ctx, 'boomlingslogo.png', 320, 66.667);
+    // vertical menu: Play / Store / Extras / Free Gold. Positions are the original game's own values, read from the running game with Frida:
+    // the menu node sits at (160, 266.667) in its 320x533.33 layer, labels at x +14.5 / +30.5 / +36.5 / +41 and y +87.333 / +25.111 / -36.111 / -92.333,
+    // the boomling blocks at x -80. canvas px = (2x, 1013.333 - 2y) for original layer coordinates (x, y)
     const items = [['mainPlayBtn_001.png', () => this.app.startFlow()], ['mainStoreBtn_001.png', () => this.app.go(new ShopScreen(this.app))], ['mainExtrasBtn_001.png', () => this.app.go(new this.app.Extras(this.app))], ['freeGoldBtn_001.png', () => this.app.netError()]];
-    // positions measured from the real game on a 480x800 screen (design area starts 40px down, scale 4/3 to canvas px)
-    const ys = [305, 429.6, 552.67, 665.3], dxs = [-0.67, -0.67, -0.33, 0.33];
+    const ys = [305.333, 429.778, 552.222, 664.667], lxs = [349, 381, 393, 402];
     items.forEach(([name, fn], i) => {
-      const [wpx, hpx] = menu.size(name), cx = 237.7 + dxs[i] + wpx / 2, cy = ys[i];
+      const [wpx, hpx] = menu.size(name), cx = lxs[i], cy = ys[i];
       const press = this.pscale(cx - wpx / 2, cy - hpx / 2, wpx, hpx);
       menu.draw(ctx, name, cx, cy, { scale: press });
       this.hits.add(cx - wpx / 2, cy - hpx / 2, wpx, hpx, fn, i);
@@ -100,17 +101,24 @@ export class MenuScreen extends Screen {
       this.hits.add(160 - 60, cy - 60, 120, 120, fn, 10 + i);
     });
     // glitter around the logo (glitterEffect.plist)
-    if (this.G.fx && (!this.glit || this.glit.dead)) this.glit = this.G.fx.spawn('glitterEffect', 320, 69, { layer: 'menu', alive: () => this.app.top() === this });
-    // everything below is placed from measurements of the real game (480x800 screen -> canvas: x*4/3, (y-40)*4/3)
-    this.sprite(ctx, ui, 'dailyBtn_001.png', 550.37, 186.37, 1, () => this.app.claimDaily());
-    menu.draw(ctx, 'robtoplogo_small.png', 120, 954.3);
-    menu.draw(ctx, 'hello_001.png', 271.7, 973.3);
-    this.sprite(ctx, menu, 'feedbackBtn_001.png', 59.7, 853.7, 1, () => this.app.dialog('Feedback', 'Sending feedback needs an internet connection, which the offline version does not have.', [['OK', null]]));
-    menu.draw(ctx, 'feedback_001.png', 175.7, 873.7);
-    const mg = this.G.img.more; ctx.drawImage(mg, 560 - mg.width / 2, 854.3 - mg.height / 2);
-    this.hits.add(560 - mg.width / 2, 854.3 - mg.height / 2, mg.width, mg.height, () => this.app.dialog('More Games', 'More games from RobTop need an internet connection.', [['OK', null]]));
-    menu.draw(ctx, 'rate_001.png', 481.7, 954.3);
-    this.sprite(ctx, menu, 'rateBtn_001.png', 581, 954.3, 1, () => this.app.toast('Thanks!', 'Enjoy the game.'));
+    if (this.G.fx && (!this.glit || this.glit.dead)) this.glit = this.G.fx.spawn('glitterEffect', 320, 66.667, { layer: 'menu', alive: () => this.app.top() === this });
+    // the small buttons, original values (layer x, y): daily (275, 413.333), rate (290, 30) + label (240.994, 30), robtop (60, 30), hello (136, 20),
+    // feedback button (30, 80) + label (88, 70), more games (280, 80)
+    // the daily button's sprite pulses forever: CCEaseInOut(CCScaleTo 0.5s -> 1.05), CCEaseInOut(CCScaleTo 0.5s -> 0.95), ease rate 2 (the sequence restarts from 0.95)
+    const [dw, dh] = ui.size('dailyBtn_001.png'), dk = this.pscale(550 - dw / 2, 186.667 - dh / 2, dw, dh);
+    const ease = (u) => (u < 0.5 ? 0.5 * Math.pow(2 * u, 2) : 1 - 0.5 * Math.pow(2 - 2 * u, 2));
+    const pt = this.t < 1 ? this.t : (this.t - 1) % 1, p0 = this.t < 1 ? 1 : 0.95;
+    const pulse = pt < 0.5 ? p0 + (1.05 - p0) * ease(pt / 0.5) : 1.05 + (0.95 - 1.05) * ease((pt - 0.5) / 0.5);
+    ui.draw(ctx, 'dailyBtn_001.png', 550, 186.667, { scale: dk * pulse });
+    this.hits.add(550 - dw / 2, 186.667 - dh / 2, dw, dh, () => this.app.claimDaily());
+    menu.draw(ctx, 'robtoplogo_small.png', 120, 953.333);
+    menu.draw(ctx, 'hello_001.png', 272, 973.333);
+    this.sprite(ctx, menu, 'feedbackBtn_001.png', 60, 853.333, 1, () => this.app.dialog('Feedback', 'Sending feedback needs an internet connection, which the offline version does not have.', [['OK', null]]));
+    menu.draw(ctx, 'feedback_001.png', 176, 873.333);
+    const mg = this.G.img.more; ctx.drawImage(mg, 560 - mg.width / 2, 853.333 - mg.height / 2);
+    this.hits.add(560 - mg.width / 2, 853.333 - mg.height / 2, mg.width, mg.height, () => this.app.dialog('More Games', 'More games from RobTop need an internet connection.', [['OK', null]]));
+    menu.draw(ctx, 'rate_001.png', 481.988, 953.333);   // the rate label does not move in the original (no action on it)
+    this.sprite(ctx, menu, 'rateBtn_001.png', 580, 953.333, 1, () => this.app.toast('Thanks!', 'Enjoy the game.'));
     const nm = this.G.save.d.name.toUpperCase().slice(0, 12);
     if (this.G.save.d.name !== 'Player') this.f.gold.draw(ctx, nm, 273 + menu.size('hello_001.png')[0] / 2 + 10, 976, { align: 'left', scale: 0.55 });
     this.hits.add(200, 940, 330, 70, () => this.app.rename());
