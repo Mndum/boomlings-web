@@ -174,6 +174,20 @@ export function brownList(ctx, x, y, w, h, gx0 = 0, gx1 = 0, rim = 3, topRim = 4
   ctx.restore();
 }
 
+// ---- Facebook friends leaderboard (only when the backend has Facebook set up and this player is linked)
+const fbFriendsOn = (s) => { const a = s.G.api; return !!(a && a.online && a.fbAppId && a.user && a.user.fb && s.fr !== 'expired'); };
+const fbButton = (s) => { const a = s.G.api; if (a && a.online && a.fbAppId) s.app.fb().then((ok) => { if (ok) s.fr = undefined; }); else if (a && a.online) s.app.dialog('Facebook', 'Facebook login is not set up on this server yet.', [['OK', null]]); else s.app.dialog('Offline', 'Facebook is not available in the offline version of the game.', [['OK', null]]); };
+function friendsOnline(s, ctx, sc, cy) {
+  const api = s.G.api;
+  if (s.fr === undefined) { s.fr = null; api.fbFriends().then((j) => { s.fr = j; }).catch((e) => { s.fr = e && e.fbExpired ? 'expired' : false; }); }
+  if (s.fr === null) { const img = spinnerImg(s.G); if (img) { ctx.save(); ctx.translate(sc.w / 2, cy); ctx.rotate(s.t * 5.2); ctx.drawImage(img, -img.width / 2, -img.height / 2); ctx.restore(); } sc.contentH = sc.h; return; }
+  if (s.fr === false) { s.f.gold.draw(ctx, 'COULD NOT LOAD', sc.w / 2, 150, { scale: 0.62 }); sc.contentH = sc.h; return; }
+  const list = s.fr.entries, me = api.user && api.user.name;
+  if (!list.length) { s.f.gold.draw(ctx, 'NO FRIENDS ON THE', sc.w / 2, 110, { scale: 0.62 }); s.f.gold.draw(ctx, 'LEADERBOARD YET', sc.w / 2, 156, { scale: 0.62 }); }
+  list.forEach((e, i) => highscoreRow(s, ctx, { ...e, icon: e.icon || 'kIcon_001' }, i, 4 + i * 80, sc.w, i % 2 ? 0.14 : 0.0, !!me && e.name === me));
+  sc.contentH = Math.max(sc.h, 4 + list.length * 80);
+}
+
 export class ExtrasPanel extends SlidePanel {
   constructor(app, tab = 'friends') { super(app); this.tab = tab === 'stats' ? 'global' : tab; this.scroll = new ScrollArea(PX(10) + 6, PY(366), PX(300) - 12, 590); }
   draw(ctx) {
@@ -186,7 +200,7 @@ export class ExtrasPanel extends SlidePanel {
     // (the rim has a gap under the active tab).
     const tabs = [['ach', 'topTab', 80], ['global', 'globalTab', 176], ['friends', 'friendsTab', 176], ['local', 'localTab', 176]];
     const place = []; { let t = 16; for (const [k, n, w] of tabs) { place.push({ k, n, w, x: t }); t += w; } }
-    const drawTab = (e, dx) => { const on = this.tab === e.k; this.sprite(ctx, ui, e.n + (on ? '_on' : '') + '_001.png', e.x + e.w / 2 + dx, 193.6, 1, () => { this.tab = e.k; this.scroll.off = 0; this.lb = undefined; }); };
+    const drawTab = (e, dx) => { const on = this.tab === e.k; this.sprite(ctx, ui, e.n + (on ? '_on' : '') + '_001.png', e.x + e.w / 2 + dx, 193.6, 1, () => { this.tab = e.k; this.scroll.off = 0; this.lb = undefined; this.fr = undefined; }); };
     place.forEach((e, ti) => drawTab(e, [2.67, 0.67, -1, -2.67][ti])); // every tab, selected or not, sits behind the list
     const act = place.find((e) => e.k === this.tab);
     brownList(ctx, sc.x, sc.y, sc.w, sc.h, 0, 0, 6.5, 7.3);
@@ -194,7 +208,7 @@ export class ExtrasPanel extends SlidePanel {
     if (this.tab === 'local') this.drawLocal(ctx, sc);
     else if (this.tab === 'global' && this.G.api && this.G.api.online) this.drawOnline(ctx, sc);
     else if (this.tab === 'global' || this.tab === 'ach') this.drawSpinner(ctx, sc);
-    else if (this.tab === 'friends') this.drawFriends(ctx, sc);
+    else if (this.tab === 'friends') { if (fbFriendsOn(this)) friendsOnline(this, ctx, sc, 540 - sc.y); else this.drawFriends(ctx, sc); }
     else this.drawSpinner(ctx, sc);
     sc.end(ctx); sc.clamp(); sc.scrollbar(ctx);
     ui.draw(ctx, 'blueBottomBar_001.png', 320, 880);
@@ -224,7 +238,7 @@ export class ExtrasPanel extends SlidePanel {
     richText(ctx, this.f.gold, 'Login to Facebook to compare scores with friends.', 105.7, 215, { scale: 0.79, maxWidth: 400, lineHeight: 48.7 });
     const bx = 300.33, by = 373.63;
     ctx.save(); ctx.translate(0, 0); this.G.ui.draw(ctx, 'fbLogInBtn_001.png', bx, by);
-    this.rowHit(bx - 116, by - 40, 232, 80, () => this.app.dialog('Offline', 'Facebook is not available in the offline version of the game.', [['OK', null]]));
+    this.rowHit(bx - 116, by - 40, 232, 80, () => fbButton(this));
     ctx.restore();
     sc.contentH = sc.h;
   }
@@ -785,7 +799,7 @@ export class ResultsScreen extends Screen {
     // tab strip + list (BoomHighscoreList type 6)
     const tabs = [['global', 'globalTab', 176], ['friends', 'friendsTab', 176], ['local', 'localTab', 176], ['stats', 'statsTab', 80]];
     const place = []; { let x = 16; for (const [k, n, w] of tabs) { place.push({ k, n, w, x }); x += w; } }
-    for (const [ti, e] of place.entries()) this.sprite(ctx, ui, e.n + (this.tab === e.k ? '_on' : '') + '_001.png', e.x + e.w / 2 + [2.5, 0.83, -0.83, -2.5][ti], 468.3, 1, () => { this.tab = e.k; this.list.off = 0; });
+    for (const [ti, e] of place.entries()) this.sprite(ctx, ui, e.n + (this.tab === e.k ? '_on' : '') + '_001.png', e.x + e.w / 2 + [2.5, 0.83, -0.83, -2.5][ti], 468.3, 1, () => { this.tab = e.k; this.list.off = 0; this.fr = undefined; });
     const act = place.find((e) => e.k === this.tab), sc = this.list;
     brownList(ctx, sc.x, sc.y, sc.w, sc.h, 0, 0, 6.5, 7.3);
     sc.begin(ctx);
@@ -793,8 +807,10 @@ export class ResultsScreen extends Screen {
       const L = this.G.save.d.scores.slice(0, 20);
       L.forEach((r, i) => highscoreRow(this, ctx, r, i, 4 + i * 80, sc.w, i % 2 ? 0.14 : 0.0, i === s.lbIndex));
       sc.contentH = 4 + L.length * 80;
+    } else if (this.tab === 'friends' && fbFriendsOn(this)) {
+      friendsOnline(this, ctx, sc, sc.h / 2);
     } else if (this.tab === 'friends') {
-      richText(ctx, f.gold, 'Login to Facebook to compare scores with friends.', 105.07, 81.6, { scale: 0.79, maxWidth: 400, lineHeight: 46 }); ui.draw(ctx, 'fbLogInBtn_001.png', 299.53, 237.57); this.hits.add(sc.x + 299.53 - 116, sc.y + 237.57 - 40, 232, 80, () => this.app.dialog('Offline', 'Facebook is not available in the offline version of the game.', [['OK', null]])); sc.contentH = sc.h;
+      richText(ctx, f.gold, 'Login to Facebook to compare scores with friends.', 105.07, 81.6, { scale: 0.79, maxWidth: 400, lineHeight: 46 }); ui.draw(ctx, 'fbLogInBtn_001.png', 299.53, 237.57); this.hits.add(sc.x + 299.53 - 116, sc.y + 237.57 - 40, 232, 80, () => fbButton(this)); sc.contentH = sc.h;
     } else if (this.tab === 'stats') {
       ExtrasPanel.prototype.drawStats.call(this, ctx, sc);
     } else {

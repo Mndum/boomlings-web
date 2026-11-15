@@ -46,7 +46,7 @@ async function newSession(env, userId) {
   return tok;
 }
 
-const profile = (u, extra = {}) => ({ id: u.id, name: u.name, refCode: u.ref_code, pendingGold: Math.max(0, u.earned_gold - u.claimed_gold), lastIap: u.last_iap || 0, ...extra });
+const profile = (u, extra = {}) => ({ id: u.id, name: u.name, refCode: u.ref_code, pendingGold: Math.max(0, u.earned_gold - u.claimed_gold), lastIap: u.last_iap || 0, fb: !!u.fb_id, ...extra });
 const iapCooldown = (env) => Math.round((+env.IAP_COOLDOWN_DAYS || 3) * 86400);
 const remain = (s) => { const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.ceil((s % 3600) / 60); return d ? d + ' day' + (d > 1 ? 's' : '') + (h ? ' ' + h + ' h' : '') : h ? h + ' h ' + m + ' min' : m + ' min'; };
 
@@ -174,6 +174,54 @@ const routes = {
     return J({ ok: true });
   },
 
+  // ---- Facebook login + friends leaderboard. Needs FB_APP_ID (var) and FB_APP_SECRET (secret); without them the game hides it.
+  async 'POST /api/fb/login'(req, env, u) {
+    const { token } = await body(req, 3000);
+    const fb = await fbVerify(env, token); if (fb.error) return bad(fb.error, fb.status);
+    const owner = await env.DB.prepare('SELECT * FROM users WHERE fb_id = ?').bind(fb.id).first();
+    if (u) {   // already signed in: link this Facebook account to the player
+      if (owner && owner.id !== u.id) return bad('That Facebook account is already linked to another player', 409);
+      await env.DB.prepare('UPDATE users SET fb_id = ? WHERE id = ?').bind(fb.id, u.id).run();
+      return J({ token: null, linked: true, user: profile({ ...u, fb_id: fb.id }) });
+    }
+    if (owner) {
+      if (owner.banned) return bad('This account is banned' + (owner.ban_reason ? ': ' + owner.ban_reason : ''), 403);
+      return J({ token: await newSession(env, owner.id), user: profile(owner) });
+    }
+    // first time: make an account from the Facebook name, with a random password (they sign in with Facebook)
+    const salt = crypto.getRandomValues(new Uint8Array(16)), hash = await hashPw(hex(crypto.getRandomValues(new Uint8Array(24))), salt);
+    let id = null;
+    for (let i = 0; i < 8 && !id; i++) {
+      const nm = fbName(fb.name, i), lc = nm.toLowerCase();
+      if (await env.DB.prepare('SELECT 1 FROM users WHERE name_lc = ?').bind(lc).first()) continue;
+      try { id = (await env.DB.prepare('INSERT INTO users (name, name_lc, pw_hash, pw_salt, ref_code, created_at, fb_id) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(nm, lc, hash, b64(salt), newRefCode(), now(), fb.id).run()).meta.last_row_id; } catch (e) { if (!/UNIQUE/i.test(String(e))) throw e; }
+    }
+    if (!id) return bad('Could not create account, try again', 500);
+    const nu = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(id).first();
+    return J({ token: await newSession(env, id), user: profile(nu), created: true });
+  },
+  // scores of the players whose Facebook account is a friend of this player's (and their own), ordered like the global list
+  async 'POST /api/fb/friends'(req, env, u) {
+    if (!u.fb_id) return bad('Log in with Facebook first', 409);
+    const { token } = await body(req, 3000);
+    const fb = await fbVerify(env, token); if (fb.error) return bad(fb.error, fb.status);
+    if (fb.id !== u.fb_id) return bad('That is a different Facebook account', 403);
+    const ids = [u.fb_id]; let url = (env.FB_GRAPH || 'https://graph.facebook.com') + '/me/friends?limit=200&access_token=' + encodeURIComponent(token);
+    for (let i = 0; i < 5 && url; i++) {
+      const r = await fetch(url).then((x) => x.json()).catch(() => null);
+      if (!r || !Array.isArray(r.data)) break;
+      r.data.forEach((f) => ids.push(String(f.id))); url = r.paging && r.paging.next || null;
+    }
+    const entries = [];
+    for (let i = 0; i < ids.length; i += 90) {
+      const part = ids.slice(i, i + 90), q = part.map(() => '?').join(',');
+      const rows = await env.DB.prepare('SELECT u.name AS name, s.best_score AS score, s.best_level AS level, s.icon AS icon, s.rank AS rank FROM scores s JOIN users u ON u.id = s.user_id WHERE s.best_score > 0 AND u.banned = 0 AND u.fb_id IN (' + q + ')').bind(...part).all();
+      entries.push(...rows.results);
+    }
+    entries.sort((a, b) => b.level - a.level || b.score - a.score);
+    return J({ entries: entries.slice(0, 100), me: null });
+  },
+
   // ---- referral codes
   async 'POST /api/redeem'(req, env, u) {
     const { code } = await body(req, 500);
@@ -185,7 +233,7 @@ const routes = {
   },
 
   // ---- free in-app purchases: every pack is granted at no cost (our own packs, see IAP_PACKS)
-  async 'GET /api/iap'(req, env) { return J({ packs: IAP_PACKS, cooldown: iapCooldown(env) }); },
+  async 'GET /api/iap'(req, env) { return J({ packs: IAP_PACKS, cooldown: iapCooldown(env), fbAppId: env.FB_APP_ID && env.FB_APP_SECRET ? String(env.FB_APP_ID) : '' }); },
   async 'POST /api/iap'(req, env, u) {
     const { pack } = await body(req, 500);
     const g = IAP_PACKS[pack];
@@ -201,8 +249,28 @@ const routes = {
   },
 };
 
+
+// Facebook: check the token really belongs to OUR app (debug_token with the app secret), then read who it is
+async function fbVerify(env, token) {
+  if (!env.FB_APP_ID || !env.FB_APP_SECRET) return { error: 'Facebook login is not set up on this server yet.', status: 503 };
+  if (typeof token !== 'string' || token.length < 20 || token.length > 1500) return { error: 'Bad Facebook token', status: 400 };
+  const dbg = await fetch((env.FB_GRAPH || 'https://graph.facebook.com') + '/debug_token?input_token=' + encodeURIComponent(token) + '&access_token=' + encodeURIComponent(env.FB_APP_ID + '|' + env.FB_APP_SECRET)).then((r) => r.json()).catch(() => null);
+  const d = dbg && dbg.data;
+  if (!d || !d.is_valid || String(d.app_id) !== String(env.FB_APP_ID)) return { error: 'Facebook did not accept that login. Try again.', status: 401 };
+  const me = await fetch((env.FB_GRAPH || 'https://graph.facebook.com') + '/me?fields=id,name&access_token=' + encodeURIComponent(token)).then((r) => r.json()).catch(() => null);
+  if (!me || !me.id) return { error: 'Could not read your Facebook profile', status: 401 };
+  return { id: String(me.id), name: String(me.name || '') };
+}
+// a game name (3-12 letters/numbers/space/_/-) from a Facebook name; attempt > 0 adds digits when the name is taken
+function fbName(raw, attempt) {
+  let n = String(raw || '').replace(/[^A-Za-z0-9 _-]/g, '').trim().slice(0, 12).trim();
+  if (n.length < 3) n = 'Player';
+  if (attempt > 0) n = n.slice(0, 12 - 3) + String(100 + Math.floor(Math.random() * 900));
+  return n;
+}
+
 const PUBLIC = new Set(['POST /api/register', 'POST /api/login', 'GET /api/iap', 'GET /api/ratings', 'POST /api/rate']);
-const OPTIONAL_AUTH = new Set(['GET /api/leaderboard']);
+const OPTIONAL_AUTH = new Set(['GET /api/leaderboard', 'POST /api/fb/login']);
 
 async function redeem(env, userId, codeRaw) {
   const code = String(codeRaw || '').trim().toUpperCase();

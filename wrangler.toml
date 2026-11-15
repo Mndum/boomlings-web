@@ -28,3 +28,6 @@ REF_REWARD_NEW = "100"     # gold for the player who enters a code
 REF_REWARD_OWNER = "100"   # gold for the code's owner
 REF_MAX_PER_OWNER = "50"
 IAP_COOLDOWN_DAYS = "3"    # one free gold pack per account per this many days
+# Facebook login: create an app at developers.facebook.com, put its App ID here, and store the secret with
+#   wrangler secret put FB_APP_SECRET
+# FB_APP_ID = "123456789012345"

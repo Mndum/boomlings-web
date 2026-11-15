@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
   last_iap    INTEGER NOT NULL DEFAULT 0,  -- when they last took a free gold pack
   banned      INTEGER NOT NULL DEFAULT 0,
   ban_reason  TEXT,
+  fb_id       TEXT,                        -- linked Facebook account (Facebook login / friends leaderboard)
   created_at  INTEGER NOT NULL
 );
 
@@ -92,3 +93,6 @@ CREATE TABLE IF NOT EXISTS ratings (
   ip_hash TEXT
 );
 CREATE INDEX IF NOT EXISTS ratings_at ON ratings(at DESC);
+
+-- existing databases: ALTER TABLE users ADD COLUMN fb_id TEXT; first, then this index
+CREATE UNIQUE INDEX IF NOT EXISTS users_fb ON users(fb_id);

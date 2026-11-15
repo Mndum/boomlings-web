@@ -18,13 +18,32 @@ export class Api {
   }
   // is there a backend at all? who am I?
   async init() {
-    try { const j = await this.req('GET', 'api/iap'); this.packs = j.packs; this.cooldown = j.cooldown || 259200; this.online = true; } catch (e) { this.online = false; return; }
+    try { const j = await this.req('GET', 'api/iap'); this.packs = j.packs; this.cooldown = j.cooldown || 259200; this.fbAppId = j.fbAppId || ''; this.online = true; } catch (e) { this.online = false; return; }
     if (this.token) { try { this.user = (await this.req('GET', 'api/me')).user; this.claim().catch(() => {}); } catch (e) { if (e.status === 401) this.setToken(''); } }   // claim: gold gifted while away
+    if (this.fbAppId) this.loadFb().catch(() => {});
   }
   setToken(t) { this.token = t; try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch (e) { /* ignore */ } if (!t) this.user = null; }
   async register(name, password, ref) { const j = await this.req('POST', 'api/register', { name, password, ref: ref || undefined }); this.setToken(j.token); this.user = j.user; return j; }
   async login(name, password) { const j = await this.req('POST', 'api/login', { name, password }); this.setToken(j.token); this.user = j.user; return j; }
   async logout() { try { await this.req('POST', 'api/logout'); } catch (e) { /* ignore */ } this.setToken(''); this.saveBase = 0; }
+  // ---- Facebook: the SDK is loaded once (early, so FB.login can open its popup straight from a tap)
+  loadFb() {
+    if (!this.fbAppId) return Promise.reject(new Error('Facebook login is not set up on this server yet.'));
+    return this._fb || (this._fb = new Promise((res, rej) => {
+      if (window.FB) return res(window.FB);
+      window.fbAsyncInit = () => { window.FB.init({ appId: this.fbAppId, version: 'v19.0', cookie: false, xfbml: false }); res(window.FB); };
+      const s = document.createElement('script'); s.src = 'https://connect.facebook.net/en_US/sdk.js'; s.async = true;
+      s.onerror = () => { this._fb = null; rej(new Error('Could not load Facebook')); }; document.head.appendChild(s);
+    }));
+  }
+  async fbToken(interactive) {
+    const FB = window.FB || (await this.loadFb());
+    if (interactive) { const r = await new Promise((res) => FB.login(res, { scope: 'public_profile,user_friends' })); if (!r || r.status !== 'connected') throw new Error('Facebook login was cancelled'); return r.authResponse.accessToken; }
+    const st = await new Promise((res) => FB.getLoginStatus(res));
+    return st && st.status === 'connected' ? st.authResponse.accessToken : null;
+  }
+  async fbLogin() { const j = await this.req('POST', 'api/fb/login', { token: await this.fbToken(true) }); if (j.token) this.setToken(j.token); this.user = j.user; return j; }
+  async fbFriends() { const t = await this.fbToken(false); if (!t) throw Object.assign(new Error('Facebook session ended'), { fbExpired: true }); return this.req('POST', 'api/fb/friends', { token: t }); }
   async refresh() { this.user = (await this.req('GET', 'api/me')).user; return this.user; }
 
   // ---- gold the server hands out (referrals, free packs) goes straight into the local save

@@ -54,6 +54,24 @@ export async function accountFlow(app) {
   } catch (e) { app.dialog('Error', errText(e), [['OK', null]]); }
 }
 
+// Facebook login (or linking, when already signed in); resolves true when it worked
+export async function fbConnect(app) {
+  const api = app.G.api;
+  if (!api || !api.online) { app.netError(); return false; }
+  if (!api.fbAppId) { app.dialog('Facebook', 'Facebook login is not set up on this server yet.', [['OK', null]]); return false; }
+  const wasIn = api.signedIn;
+  try {
+    await api.fbLogin(); await api.claim();
+    if (wasIn) app.toast('Facebook linked', 'Friends scores are on');
+    else {
+      app.G.save.d.name = api.user.name.slice(0, 12); app.G.save.flush();
+      const how = await api.syncAfterLogin(app);
+      if (how !== 'asked') app.dialog('Signed in', 'Welcome, <cg>' + api.user.name + '</c>!' + (how === 'pulled' ? ' Your cloud save was loaded.' : ''), [['OK', null]]);
+    }
+    return true;
+  } catch (e) { app.dialog('Facebook', errText(e), [['OK', null]]); return false; }
+}
+
 function accountInfo(app) {
   const api = app.G.api, u = api.user;
   app.dialog('Account', 'Signed in as <cg>' + u.name + '</c>\nReferral code: <cy>' + u.refCode + '</c>', [
