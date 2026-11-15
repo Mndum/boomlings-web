@@ -14,8 +14,9 @@
   #loading { text-align:center; margin-top:30vh; color:var(--gold); font-size:20px; }
   img { display:block; max-width:100%; }
   .center { text-align:center; }
-  .logo { margin:6px auto 0; width:min(440px,92%); }
-  .head { margin:6px auto 18px; height:56px; }
+  .logo { margin:0 auto; width:min(300px,70%); }
+  .sub { text-align:center; margin:0 auto 18px; max-width:440px; font-weight:600; color:#dbe9ff; }
+  .head { margin:4px auto 8px; height:40px; }
   .head img { margin:0 auto; height:100%; width:auto; }
 
   /* panels use the game's own nine-slice art, drawn behind the content */
@@ -53,11 +54,10 @@
   input:focus,textarea:focus { border-color:var(--gold); }
   textarea { min-height:96px; resize:vertical; }
 
-  .send { display:block; margin:18px auto 0; background:none; border:0; padding:0; cursor:pointer; transition:transform .1s; }
-  .send img { width:min(150px,45vw); }
-  .send:hover { transform:scale(1.05); }
-  .send:active { transform:scale(.95); }
-  .send:disabled { filter:grayscale(1) brightness(.6); cursor:default; transform:none; }
+  .send { display:block; width:100%; margin:18px 0 0; padding:13px 16px; font:800 20px/1 "Trebuchet MS",Verdana,sans-serif; color:#fff; text-shadow:0 2px 0 rgba(0,60,0,.55); background:linear-gradient(#59e06a,#1ea033); border:3px solid #fff; border-radius:12px; box-shadow:0 4px 0 rgba(0,0,0,.35); cursor:pointer; }
+  .send:hover { filter:brightness(1.08); }
+  .send:active { transform:translateY(3px); box-shadow:0 1px 0 rgba(0,0,0,.35); }
+  .send:disabled { background:#5b6f94; text-shadow:none; color:#c9d5ea; cursor:default; transform:none; box-shadow:none; }
   .msg { text-align:center; margin-top:10px; min-height:1.4em; }
   .msg.ok { color:#7dff9a; } .msg.err { color:#ff8a80; }
 
@@ -78,6 +78,7 @@
 <main id="page">
   <img class="logo" id="logo" alt="Boomlings">
   <div class="head" id="head"></div>
+  <p class="sub">This is an unofficial fan-made browser port of Boomlings. Tell me how it plays and what to fix. No account needed.</p>
 
   <section class="panel"><div class="in">
     <div class="sum">
@@ -91,7 +92,7 @@
     <div class="stars" id="stars" role="radiogroup" aria-label="Stars"></div>
     <div class="field"><div class="lab" data-t="Name (optional)"></div><input id="name" maxlength="20" placeholder="Anonymous" autocomplete="nickname"></div>
     <div class="field"><div class="lab" data-t="Review (optional)"></div><textarea id="text" maxlength="500" placeholder="What do you like? What should be better?"></textarea></div>
-    <button class="send" id="send" disabled aria-label="Send my rating"><img id="sendImg" alt="Send"></button>
+    <button class="send" id="send" disabled>Submit review</button>
     <div class="msg" id="msg"></div>
   </div></section>
 
@@ -101,6 +102,7 @@
   </div></section>
 
   <a class="back" href="/"><img id="backImg" alt=""> Back to the game</a>
+  <p class="sub" style="font-size:13px;margin-top:14px;opacity:.85">Boomlings is made by RobTop Games. This fan port is not affiliated with or endorsed by them. Reviews are public; please keep them friendly.</p>
 </main>
 
 <script type="module">
@@ -127,9 +129,8 @@ const textImg = (font, text, scale, cls = '') => `<img class="${cls}" src="${tex
 // background: the main menu's blue rays, like the game
 { const bg = menu.frames['MainMenuBG_001.png'] && frameURL(menu, 'MainMenuBG_001.png'); if (bg) document.body.style.backgroundImage = `url(${bg})`; }
 $('#logo').src = frameURL(menu, 'boomlingslogo.png');
-$('#head').innerHTML = textImg(big, 'RATE US!', 1.1);
+$('#head').innerHTML = textImg(big, 'RATE THE PORT', 0.75);
 $('#revTitle').innerHTML = textImg(gold, 'WHAT PEOPLE SAY', 0.62);
-$('#sendImg').src = frameURL(menu, 'rateBtn_001.png');
 $('#backImg').src = frameURL(menu, 'backArrow_001.png');
 document.querySelectorAll('.lab[data-t]').forEach((e) => { e.innerHTML = textImg(gold, e.dataset.t.toUpperCase(), 0.48); });
 const STAR = frameURL(ui, 'star_001.png');
