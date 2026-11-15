@@ -61,7 +61,7 @@ export class Pranks {
       case 'silence': { const au = this.G.audio, was = au.enabled, mv = au.mv; au.enabled = false; au.setMusicVol(0); setTimeout(() => { au.enabled = was; au.setMusicVol(mv); }, secs * 1000); return; }
       case 'blackout': {   // black screen, two pairs of eyes (the animated eye) blink open one after another
         const o = this.overlay('', Math.min(secs, 8), '#000', false), at = [[2, 12, 34, 0], [48, 14, 34, 1], [10, 52, 44, 0], [46, 54, 44, 1]];   // left %, top %, width %, mirrored
-        at.forEach(([l, t, w, m], i) => setTimeout(() => { if (!o.isConnected) return; const im = document.createElement('img'); im.src = 'assets/blackout-eye.gif?' + i; im.draggable = false; im.style.cssText = 'position:absolute;left:' + l + '%;top:' + t + '%;width:' + w + '%;mix-blend-mode:lighten;pointer-events:none' + (m ? ';transform:scaleX(-1)' : ''); o.appendChild(im); }, i * 450));
+        at.forEach(([l, t, w, m], i) => setTimeout(() => { if (!o.isConnected) return; const im = document.createElement('img'); im.src = 'assets/blackout-eye.gif?' + i; im.draggable = false; im.style.cssText = 'position:absolute;left:' + l + '%;top:' + t + '%;width:' + w + '%;mix-blend-mode:lighten;pointer-events:none' ; o.appendChild(im); }, i * 450));
         return;
       }
       case 'jumpscare': {
