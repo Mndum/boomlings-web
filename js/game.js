@@ -987,7 +987,9 @@ export class PlayScene {
       const maxW = topW - 32, w = Math.max(10, maxW * frac);
       ctx.save(); ctx.beginPath(); ctx.rect(fx, fyBottom - fh, w, fh); ctx.clip();
       const pat = this.G.img.pointsbar;
-      for (let px = fx; px < fx + w; px += pat.width) ctx.drawImage(pat, px, fyBottom - fh, pat.width, fh);
+      // the stripes scroll along the bar (a tile per ~1.2 s), the tile is seamless so the loop never jumps
+      const off = ((performance.now() / 1200) % 1) * pat.width;
+      for (let px = fx - pat.width + off; px < fx + w; px += pat.width) ctx.drawImage(pat, px, fyBottom - fh, pat.width, fh);
       ctx.restore();
     }
     ui.draw(ctx, 'pointsBar_Top_001.png', W / 2, py);
