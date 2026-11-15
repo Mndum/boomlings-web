@@ -32,7 +32,7 @@ const TUT_STEPS = [
   { keep: false, add: ['p2,3', 'p5,2', 'p6,2', 'p5,3', 'p6,3', 'p5,4', 'p6,4'], mover: [2, 3], target: [4, 3], text: [[['New ', 'w'], ['Objects', 'y'], [' spawn', 'w']], [['after each ', 'w'], ['move', 'g']], [['you make!', 'w']]], textPos: [[230, 455], [230, 500], [230, 548]] },
   { popup: ['basics2', 'tutorial_basics2_001'], keep: false, add: ['r0,4', 'r1,4', 'r2,4', 'b4,4', 'b5,4', 'b6,4', 'b7,4', 'rB3,2'], mover: [3, 2], target: [3, 4], text: [[['Bombs', 'g'], [' can create', 'w']], [['Chain Reactions', 'y']], [['for more points!', 'w']]], textPos: [[240, 457], [240, 500], [240, 548]] },
   { keep: true, add: ['r1,1'], mover: [1, 1], target: [1, 3], text: [[['Bombs', 'g'], [' can create', 'w']], [['Chain Reactions', 'y']], [['for more points!', 'w']]], textPos: [[240, 457], [240, 500], [240, 548]] },
-  { keep: false, add: ['g3,0', 'g3,1', 'g4,1', 'g5,1', 'bB6,1', 'b6,2', 'b6,3', 'b6,4', 'r3,5', 'r4,5', 'rB5,5', 'r1,2'], mover: [1, 2], target: [2, 4], last: true, text: [[['Fill', 'g'], [' the bar to', 'w']], [['COMPLETE', 'g'], [' the level!', 'w']]], textPos: [[240, 470], [240, 515]] },
+  { keep: false, add: ['g3,0', 'g3,1', 'g4,1', 'g5,1', 'bB6,1', 'b6,2', 'b6,3', 'b6,4', 'r3,4', 'r4,4', 'rB5,4', 'r1,2'], mover: [1, 2], target: [2, 4], last: true, text: [[['Fill', 'g'], [' the bar to', 'w']], [['COMPLETE', 'g'], [' the level!', 'w']]], textPos: [[240, 470], [240, 515]] },
 ];
 // GamePiece::getStrongColorValue (r,g,b / 255) per PieceColor
 const STRONG_COLOR = { 0: [1, 1, 1], 1: [100 / 255, 1, 80 / 255], 2: [1, 110 / 255, 150 / 255], 3: [1, 165 / 255, 75 / 255], 4: [100 / 255, 165 / 255, 1], 5: [1, 110 / 255, 250 / 255], 6: [1, 1, 100 / 255] };
