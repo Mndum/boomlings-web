@@ -212,7 +212,7 @@ async function boot() {
     G.audio.musicOn = save.d.opts.music; G.audio.enabled = save.d.opts.sfx; G.audio.haptics = save.d.opts.haptics !== false; G.audio.mv = save.d.opts.mv ?? 1; G.audio.sv = save.d.opts.sv ?? 1;
     G.audio.preload(SFX_ALL);
     if (G.audio.musicOn) G.audio.auto('BoomlingsTitle.mp3', 0.5);   // music from the moment the game loads (starts at the first tap/key if the browser blocks it until then)
-    for (const ev of ['pointerdown', 'mousedown', 'keydown', 'touchend', 'pointerup']) addEventListener(ev, () => G.audio.kick(), { capture: true });
+    for (const ev of ['pointerdown', 'mousedown', 'keydown', 'touchend', 'pointerup', 'click']) addEventListener(ev, () => G.audio.kick(), { capture: true });
     G.scene = new PlayScene(G);
     window.snap = async (n) => (await fetch('http://localhost:8766/save?name=' + n, { method: 'POST', body: canvas.toDataURL('image/png') })).status; // dev: save the canvas for pixel comparison
     // dev: record the canvas every frame to the local receiver for animation comparison
@@ -280,7 +280,7 @@ canvas.addEventListener('pointerdown', (ev) => {
   if (dragging && ev.pointerId !== activeId) return;
   dragging = true; activeId = ev.pointerId;
   try { canvas.setPointerCapture(ev.pointerId); } catch (e) { /* ignore */ }   // keep the drag when the finger slides off the canvas
-  G.audio.resume();   // iOS/Android suspend audio until (and after) a touch
+  G.audio.back();   // a touch means the player is here: clears any stuck 'away' state. iOS/Android suspend audio until (and after) a touch
   if (!G.audio.unlocked) { G.audio.unlock(); if (G.audio.musicOn) G.audio.playMusic('BoomlingsTitle.mp3', 0.5); }
   const top = app.top(); if (!top || app.fade) return;
   const [x, y] = toCanvas(ev); top.down(x, y);
@@ -303,10 +303,12 @@ try {
 } catch (e) { /* no history API */ }
 // leaving the tab / app (phone call, app switch, screen off): pause a running game and silence the sound; coming back restores the sound
 window.addEventListener('resize', () => { if (matchMedia('(orientation: landscape) and (max-height: 520px) and (pointer: coarse)').matches && app.top() instanceof PlayScreen) app.pause(); });   // phone turned sideways mid-run
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden) { const top = app.top(); if (top instanceof PlayScreen) app.pause(); G.audio.suspend(); }
-  else G.audio.resume();
-});
+const touchDev = matchMedia('(pointer: coarse)').matches;
+const leave = () => { const top = app.top(); if (top instanceof PlayScreen) app.pause(); G.audio.suspend(); };   // phone: app switch, home button, lock screen, notification shade, call
+document.addEventListener('visibilitychange', () => { if (document.hidden) leave(); else G.audio.back(); });
+addEventListener('pagehide', () => G.audio.suspend()); addEventListener('pageshow', () => G.audio.back());
+if (touchDev) { addEventListener('blur', leave); addEventListener('focus', () => { if (!document.hidden) G.audio.back(); }); }
+document.addEventListener('freeze', () => G.audio.suspend());
 canvas.addEventListener('wheel', (ev) => { ev.preventDefault(); const top = app.top(); if (top && top.wheel) top.wheel(ev.deltaY); }, { passive: false });
 window.addEventListener('keydown', (ev) => {
   const top = app.top();
