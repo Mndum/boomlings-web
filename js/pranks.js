@@ -35,7 +35,7 @@ export class Pranks {
   screenName() { const t = this.app.top && this.app.top(), n = (t && t.constructor && t.constructor.name) || '?'; return n.replace(/Screen$/, ''); }
   state() {
     const sc = this.G.scene, sv = this.G.save && this.G.save.d, playing = this.screenName() === 'Play' && sc;
-    return { screen: this.screenName(), score: playing ? Math.floor(sc.score || 0) : 0, level: playing ? sc.level || 0 : 0, gold: sv ? sv.gold : 0, rank: sv ? sv.rank : 0, effects: Object.keys(this.fx) };
+    return { screen: this.screenName(), score: playing ? Math.floor(sc.score || 0) : 0, level: playing ? sc.level || 0 : 0, gold: sv ? sv.gold : 0, rank: sv ? sv.rank : 0, icon: sv ? sv.icon : '', effects: Object.keys(this.fx) };
   }
   // frames only while somebody watches
   stream(on) {

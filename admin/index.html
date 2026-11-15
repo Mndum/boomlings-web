@@ -104,6 +104,8 @@
   a.link { color:var(--brand); cursor:pointer; text-decoration:underline; }
 
 
+  .bi { width:38px; height:38px; object-fit:contain; flex:none; }
+  .bi.big { width:56px; height:56px; }
   /* live view + pranks */
   .live { display:grid; grid-template-columns:minmax(220px,300px) 1fr; gap:16px; align-items:start; }
   @media (max-width:760px) { .live { grid-template-columns:1fr; } }
@@ -196,8 +198,32 @@ function dialog({ title, text = '', fields = [], ok = 'OK', danger = false }) {
   });
 }
 
+
+// ---- Boomlings icons: drawn from the game's own icon sheet, so the admin shows exactly what the player picked
+let ICONS = null;
+function loadIcons() {
+  return ICONS || (ICONS = (async () => {
+    const { Atlas } = await import('/js/atlas.js'), { parsePlist, fetchText } = await import('/js/plist.js');
+    const [atlas, store] = await Promise.all([Atlas.load('/assets/boomIconSheet-hd'), fetchText('/data/store.plist').then(parsePlist)]);
+    const titles = {}; Object.entries(store.Icons || {}).forEach(([id, v]) => { if (v && typeof v === 'object') titles[id] = v.title; });
+    return { atlas, titles, cache: {} };
+  })().catch(() => null));
+}
+const iconTitle = (id) => (ICONS && ICONS.v && ICONS.v.titles[id]) || '';
+function icon(id, cls = '') {
+  const I = ICONS && ICONS.v; if (!I || !/^kIcon_\d{3}$/.test(id || '')) return '';
+  if (!I.cache[id]) {
+    const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d'), name = 'boomIcon_' + String(+id.slice(6)).padStart(2, '0') + '_001.png';
+    const [w, h] = I.atlas.size(name); if (!w) return '';
+    I.atlas.draw(x, name, 64, 64, { scale: Math.min(1, 120 / Math.max(w, h)) }); I.cache[id] = c.toDataURL();
+  }
+  return `<img class="bi ${cls}" src="${I.cache[id]}" alt="${esc(iconTitle(id))}" title="${esc(iconTitle(id))}">`;
+}
+const avatar = (name, id, cls = '') => icon(id, cls) || `<div class="av">${esc(String(name)[0].toUpperCase())}</div>`;
+
 // ---- sign in / out
 async function enter() {
+  { const p = loadIcons(); ICONS = p; p.then((v) => { p.v = v; }); await p.catch(() => {}); }
   try { await api('GET', 'stats'); } catch (e) { $('#loginErr').textContent = KEY ? e.message : ''; return false; }
   $('#login').classList.add('hidden'); $('#app').classList.remove('hidden'); route(); return true;
 }
@@ -234,7 +260,7 @@ async function overview() {
       <div class="grid">${stat(s.users, 'Players', '#/players')}${stat(s.today, 'New in 24 h', '#/players')}${stat(s.sessions, 'Signed-in devices')}${stat(s.banned, 'Banned', '#/players?banned')}${stat(s.scores, 'On leaderboard', '#/leaderboard')}${stat(s.saves, 'Cloud saves')}${stat(s.referred, 'Joined via referral')}</div>
       <div class="cols">
         <div class="card"><h3>New players, last 14 days</h3>${s.perDay.length ? `<div class="bars">${s.perDay.map((d) => `<div style="height:${Math.max(4, d.n / max * 100)}%" title="${d.d}: ${d.n}"><i>${d.n}</i></div>`).join('')}</div>` : '<div class="empty">No sign-ups yet</div>'}</div>
-        <div class="card"><h3>Newest players</h3>${s.recent.length ? s.recent.map((u) => `<button class="row" onclick="go('#/players/${u.id}')"><div class="av">${esc(u.name[0].toUpperCase())}</div><div class="grow"><div class="nm">${esc(u.name)}</div><div class="mute">joined ${ago(u.created_at)}</div></div>${u.banned ? '<span class="badge bad">Banned</span>' : ''}</button>`).join('') : '<div class="empty">Nobody yet</div>'}</div>
+        <div class="card"><h3>Newest players</h3>${s.recent.length ? s.recent.map((u) => `<button class="row" onclick="go('#/players/${u.id}')">${avatar(u.name, u.icon)}<div class="grow"><div class="nm">${esc(u.name)}</div><div class="mute">joined ${ago(u.created_at)}</div></div>${u.banned ? '<span class="badge bad">Banned</span>' : ''}</button>`).join('') : '<div class="empty">Nobody yet</div>'}</div>
         <div class="card"><h3>Recent actions</h3>${s.log.length ? s.log.map((l) => `<div class="row"><div class="grow"><div class="nm">${esc(l.action)} · ${esc(l.target_name || '')}</div><div class="mute">${esc(l.detail || '')} ${ago(l.at)}</div></div></div>`).join('') : '<div class="empty">Nothing yet</div>'}</div>
       </div>`;
   } catch (e) { fail(e); }
@@ -256,7 +282,7 @@ async function players() {
     try {
       const j = await api('GET', `users?q=${encodeURIComponent(pl.q)}&filter=${pl.filter}&offset=${reset ? 0 : pl.users.length}`);
       pl.users = reset ? j.users : pl.users.concat(j.users); pl.more = j.more;
-      $('#plist').innerHTML = pl.users.length ? pl.users.map((u) => `<button class="row" onclick="go('#/players/${u.id}')"><div class="av">${esc(u.name[0].toUpperCase())}</div><div class="grow"><div class="nm">${esc(u.name)} <span class="mute">#${u.id}</span></div><div class="mute">joined ${ago(u.created_at)}${u.best_level ? ` · level ${u.best_level} · ${fmt(u.best_score)} pts` : ' · no scores yet'}</div></div>${u.banned ? '<span class="badge bad">Banned</span>' : ''}</button>`).join('') : '<div class="empty">No players match.</div>';
+      $('#plist').innerHTML = pl.users.length ? pl.users.map((u) => `<button class="row" onclick="go('#/players/${u.id}')">${avatar(u.name, u.icon)}<div class="grow"><div class="nm">${esc(u.name)} <span class="mute">#${u.id}</span></div><div class="mute">joined ${ago(u.created_at)}${u.best_level ? ` · level ${u.best_level} · ${fmt(u.best_score)} pts` : ' · no scores yet'}</div></div>${u.banned ? '<span class="badge bad">Banned</span>' : ''}</button>`).join('') : '<div class="empty">No players match.</div>';
       $('#more').innerHTML = pl.more ? '<button class="btn" id="moreBtn">Load more</button>' : '';
       if (pl.more) $('#moreBtn').onclick = () => load(false);
     } catch (e) { fail(e); }
@@ -279,10 +305,10 @@ async function openPlayer(id) {
     const d = await api('GET', 'user?id=' + id); if (openId !== id) return;
     const u = d.user, s = d.score, sv = d.save;
     const act = (a, extra = {}) => api('POST', 'action', { id, action: a, ...extra }).then(() => { openPlayer(id); if (location.hash.startsWith('#/players')) players(); }).catch(fail);
-    sh.innerHTML = `<header><div class="av">${esc(u.name[0].toUpperCase())}</div><div><h3>${esc(u.name)}</h3><div class="mute">Player #${u.id} · joined ${when(u.created_at)}</div></div><button class="close" id="x" aria-label="Close">✕</button></header>
+    sh.innerHTML = `<header>${avatar(u.name, sv && sv.icon || (s && s.icon), "big")}<div><h3>${esc(u.name)}</h3><div class="mute">Player #${u.id} · joined ${when(u.created_at)}</div></div><button class="close" id="x" aria-label="Close">✕</button></header>
       ${u.banned ? `<div class="banned-note"><b>Banned.</b> ${esc(u.ban_reason || 'No reason given.')}</div>` : ''}
       <div class="info">
-        <div><small>Best level</small>${s ? s.best_level : '—'}</div><div><small>Best score</small>${s ? fmt(s.best_score) : '—'}</div>
+        <div><small>Boomling</small>${icon(sv && sv.icon || (s && s.icon))} ${esc(iconTitle(sv && sv.icon || (s && s.icon)) || "—")}</div><div><small>Best level</small>${s ? s.best_level : '—'}</div><div><small>Best score</small>${s ? fmt(s.best_score) : '—'}</div>
         <div><small>Rank</small>${s ? s.rank : (sv && sv.rank) || '—'}</div><div><small>Signed-in devices</small>${d.sessions}</div>
         <div><small>Gold in cloud save</small>${sv && !sv.broken ? fmt(sv.gold) : '—'}</div><div><small>Games played</small>${sv && sv.games ? fmt(sv.games) : '—'}</div>
         <div><small>Referral code</small><b>${esc(u.ref_code)}</b></div><div><small>Referral gold earned</small>${fmt(u.earned_gold)}</div>
@@ -332,10 +358,10 @@ async function live() {
   const list = () => {
     if (!$('#lvList')) return;
     const arr = [...players.values()];
-    $('#lvList').innerHTML = '<h3>Online now <span class="badge">' + arr.length + '</span> <span class="mute" style="font-weight:500">' + esc(status) + '</span></h3>' + (arr.length ? arr.map((p) => `<button class="pl ${p.id === liveSel ? 'on' : ''}" data-id="${p.id}"><div class="av">${esc(p.name[0].toUpperCase())}</div><div class="grow"><div class="nm"><span class="dot"></span>${esc(p.name)}</div><div class="mute">${esc(p.state.screen || '?')}${p.state.score ? ' · ' + fmt(p.state.score) + ' pts' : ''}</div></div></button>`).join('') : '<div class="empty">Nobody is playing right now.<br>Players show up here the moment they open the game while signed in.</div>');
+    $('#lvList').innerHTML = '<h3>Online now <span class="badge">' + arr.length + '</span> <span class="mute" style="font-weight:500">' + esc(status) + '</span></h3>' + (arr.length ? arr.map((p) => `<button class="pl ${p.id === liveSel ? 'on' : ''}" data-id="${p.id}">${avatar(p.name, p.state.icon)}<div class="grow"><div class="nm"><span class="dot"></span>${esc(p.name)}</div><div class="mute">${esc(p.state.screen || '?')}${p.state.score ? ' · ' + fmt(p.state.score) + ' pts' : ''}</div></div></button>`).join('') : '<div class="empty">Nobody is playing right now.<br>Players show up here the moment they open the game while signed in.</div>');
     $('#lvList').querySelectorAll('.pl').forEach((b) => b.onclick = () => select(+b.dataset.id));
   };
-  const info = (p) => `<div><small>Screen</small>${esc(p.state.screen || '?')}</div><div><small>Score</small>${fmt(p.state.score)}</div><div><small>Level</small>${p.state.level || '—'}</div><div><small>Rank</small>${p.state.rank || '—'}</div><div><small>Gold</small>${fmt(p.state.gold)}</div><div><small>Active pranks</small>${(p.state.effects || []).join(', ') || 'none'}</div>`;
+  const info = (p) => `<div style="grid-column:1/-1"><small>Boomling</small>${icon(p.state.icon)} ${esc(iconTitle(p.state.icon) || '—')}</div><div><small>Screen</small>${esc(p.state.screen || '?')}</div><div><small>Score</small>${fmt(p.state.score)}</div><div><small>Level</small>${p.state.level || '—'}</div><div><small>Rank</small>${p.state.rank || '—'}</div><div><small>Gold</small>${fmt(p.state.gold)}</div><div><small>Active pranks</small>${(p.state.effects || []).join(', ') || 'none'}</div>`;
   const view = () => {
     const v = $('#lvView'); if (!v) return; const p = players.get(liveSel);
     if (!p && !liveAll) { v.innerHTML = '<div class="empty">Pick a player on the left.</div>'; return; }
@@ -375,7 +401,7 @@ async function leaderboard() {
   const m = $('#main'); m.innerHTML = '<h2>Leaderboard</h2><p class="sub">Ordered like the game: highest level first, then score. Click a name to manage that player.</p><div class="card" id="lb"><div class="empty">Loading…</div></div>';
   try {
     const { entries } = await api('GET', 'scores');
-    $('#lb').innerHTML = entries.length ? `<table><tr><th>#</th><th>Player</th><th class="num">Level</th><th class="num">Score</th><th></th></tr>${entries.map((e, i) => `<tr><td>${i + 1}</td><td><a class="link" onclick="go('#/players/${e.id}')">${esc(e.name)}</a> ${e.banned ? '<span class="badge bad">Banned</span>' : ''}</td><td class="num">${e.level}</td><td class="num">${fmt(e.score)}</td><td class="num"><button class="btn danger" onclick="rmScore(${e.id},'${esc(e.name).replace(/'/g, '')}')">Remove</button></td></tr>`).join('')}</table>` : '<div class="empty">No scores yet.</div>';
+    $('#lb').innerHTML = entries.length ? `<table><tr><th>#</th><th></th><th>Player</th><th class="num">Level</th><th class="num">Score</th><th></th></tr>${entries.map((e, i) => `<tr><td>${i + 1}</td><td>${icon(e.icon)}</td><td><a class="link" onclick="go('#/players/${e.id}')">${esc(e.name)}</a> ${e.banned ? '<span class="badge bad">Banned</span>' : ''}</td><td class="num">${e.level}</td><td class="num">${fmt(e.score)}</td><td class="num"><button class="btn danger" onclick="rmScore(${e.id},'${esc(e.name).replace(/'/g, '')}')">Remove</button></td></tr>`).join('')}</table>` : '<div class="empty">No scores yet.</div>';
   } catch (e) { fail(e); }
 }
 async function rmScore(id, name) { if (await dialog({ title: 'Remove ' + name + ' from the leaderboard?', text: 'Their best score is deleted.', ok: 'Remove', danger: true })) api('POST', 'action', { id, action: 'clearScore' }).then(() => { toast('Removed'); leaderboard(); }).catch(fail); }

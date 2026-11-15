@@ -48,7 +48,7 @@ const admin = {
   async 'GET users'(req, env, url) {
     const q = cleanQ(url.searchParams.get('q')), f = url.searchParams.get('filter') === 'banned' ? 1 : 0, off = Math.max(0, +url.searchParams.get('offset') || 0);
     const rows = await env.DB.prepare(`SELECT u.id, u.name, u.created_at, u.banned, u.ban_reason, u.ref_code, u.earned_gold,
-        (SELECT COUNT(*) FROM users r WHERE r.referred_by = u.id) AS referrals, s.best_score, s.best_level, s.rank, sv.updated_at AS saved_at
+        (SELECT COUNT(*) FROM users r WHERE r.referred_by = u.id) AS referrals, s.best_score, s.best_level, s.rank, sv.updated_at AS saved_at, COALESCE(json_extract(sv.data, '$.icon'), s.icon) AS icon
       FROM users u LEFT JOIN scores s ON s.user_id = u.id LEFT JOIN saves sv ON sv.user_id = u.id
       WHERE (?1 = '' OR u.name_lc LIKE '%' || ?1 || '%' OR u.ref_code = upper(?1) OR CAST(u.id AS TEXT) = ?1) AND (?2 = 0 OR u.banned = 1)
       ORDER BY u.id DESC LIMIT 51 OFFSET ?3`).bind(q, f, off).all();
@@ -67,7 +67,7 @@ const admin = {
       env.DB.prepare('SELECT id, name FROM users WHERE referred_by = ? ORDER BY id DESC LIMIT 20').bind(id).all(),
     ]);
     let save = null;
-    if (sv) { try { const d = JSON.parse(sv.data); save = { updatedAt: sv.updated_at, gold: d.gold, xp: d.xp, rank: d.rank, name: d.name, icons: (d.icons || []).length, games: d.stats && d.stats.games, best: d.best }; } catch (e) { save = { updatedAt: sv.updated_at, broken: true }; } }
+    if (sv) { try { const d = JSON.parse(sv.data); save = { updatedAt: sv.updated_at, icon: d.icon, gold: d.gold, xp: d.xp, rank: d.rank, name: d.name, icons: (d.icons || []).length, games: d.stats && d.stats.games, best: d.best }; } catch (e) { save = { updatedAt: sv.updated_at, broken: true }; } }
     return J({ user: u, score: sc, save, sessions: ses.n, referredBy: by, referrals: refs.results });
   },
 

@@ -44,7 +44,7 @@ export class Hub extends DurableObject {
     const a = this.att(ws);
     if (a.role === 'player') {
       if (m.t === 'state' && m.state && typeof m.state === 'object') {
-        a.state = { screen: String(m.state.screen || '').slice(0, 30), score: +m.state.score || 0, level: +m.state.level || 0, gold: +m.state.gold || 0, rank: +m.state.rank || 0, effects: Array.isArray(m.state.effects) ? m.state.effects.slice(0, 10).map(String) : [] };
+        a.state = { screen: String(m.state.screen || '').slice(0, 30), score: +m.state.score || 0, level: +m.state.level || 0, gold: +m.state.gold || 0, rank: +m.state.rank || 0, icon: /^kIcon_\d{3}$/.test(m.state.icon) ? m.state.icon : '', effects: Array.isArray(m.state.effects) ? m.state.effects.slice(0, 10).map(String) : [] };
         ws.serializeAttachment(a);
         this.toAdmins({ t: 'state', id: a.id, name: a.name, state: a.state });
       } else if (m.t === 'frame' && typeof m.d === 'string' && m.d.startsWith('data:image/jpeg;base64,')) {
