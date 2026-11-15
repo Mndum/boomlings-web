@@ -7,8 +7,8 @@ Accounts, cloud save, leaderboards, referral codes and free in-app purchases. Th
 ```
 npm i -g wrangler
 wrangler login
-wrangler d1 create boomlings            # copy the database_id into wrangler.toml
-wrangler d1 execute boomlings --remote --file=server/schema.sql
+wrangler d1 create boomlings-private-server            # copy the database_id into wrangler.toml
+wrangler d1 execute boomlings-private-server --remote --file=server/schema.sql
 wrangler deploy
 ```
 

@@ -33,5 +33,4 @@ CREATE TABLE IF NOT EXISTS scores (
   rank       INTEGER NOT NULL DEFAULT 1, -- player rank shown on the row
   updated_at INTEGER NOT NULL
 );
-CREATE INDEX IF NOT EXISTS scores_score ON scores(best_score DESC);
-CREATE INDEX IF NOT EXISTS scores_level ON scores(best_level DESC);
+CREATE INDEX IF NOT EXISTS scores_rank ON scores(best_level DESC, best_score DESC);

@@ -11,7 +11,7 @@ run_worker_first = ["/api/*"]
 
 [[d1_databases]]
 binding = "DB"
-database_name = "boomlings"
+database_name = "boomlings-private-server"
 database_id = "1f610573-6219-4be5-a04b-39439231cd6b"
 
 [vars]
