@@ -1,7 +1,7 @@
 // Live view + pranks for the private server. A signed-in player keeps a WebSocket open to the server's live room:
 // it reports its screen/score, streams frames of the game canvas while an admin is watching, and receives pranks instantly.
 // Every prank is cosmetic and times out by itself; nothing touches the save. Without the backend nothing happens.
-const MAX_SECONDS = 30, FRAME_MS = 60;   // ~16 frames per second while watched
+const MAX_SECONDS = 30, FRAME_MS = 250;   // 4 frames per second while watched
 const TXT = (s, n) => String(s || '').slice(0, n);
 
 export class Pranks {

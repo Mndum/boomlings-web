@@ -326,7 +326,7 @@ let liveWS = null, liveClosing = false, liveFrames = 0;
 function liveStop() { liveClosing = true; clearInterval(liveTimer); if (liveWS) { try { liveWS.close(); } catch (e) { /* ignore */ } liveWS = null; } }
 async function live() {
   const m = $('#main');
-  m.innerHTML = '<h2>Live &amp; Pranks</h2><p class="sub">A real-time view of everyone in the game right now. Pick a player to watch their screen live (about 16 frames a second), then play a harmless, time-limited prank. Nothing touches their save.</p><div class="live"><div class="card" id="lvList"><h3>Online now</h3><div class="empty">Connecting…</div></div><div class="card" id="lvView"><div class="empty">Pick a player on the left.</div></div></div>';
+  m.innerHTML = '<h2>Live &amp; Pranks</h2><p class="sub">A real-time view of everyone in the game right now. Pick a player to watch their screen live (about 4 frames a second), then play a harmless, time-limited prank. Nothing touches their save.</p><div class="live"><div class="card" id="lvList"><h3>Online now</h3><div class="empty">Connecting…</div></div><div class="card" id="lvView"><div class="empty">Pick a player on the left.</div></div></div>';
   const players = new Map();   // id -> { id, name, state }
   let status = 'Connecting…';
   const list = () => {
