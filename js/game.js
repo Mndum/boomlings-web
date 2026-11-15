@@ -57,19 +57,20 @@ class Piece {
     this.idleTimer = randRange(2, 7);
     this.shake = 0;
   }
+  idleNext() {
+    const lib = this.scene.G.lib, r = Math.random(), want = r < 0.8 ? 'Idle01' : r < 0.95 ? 'Idle02' : 'Idle03';
+    const name = lib.get(this.type, want) ? want : 'Idle01';
+    if (!lib.get(this.type, name)) return;
+    this.anim.play(name, false, () => { if (!this.dead && !this.exploding && this.anim.name === name) this.idleNext(); });
+  }
   setColor(color) { this.color = color; this.type = typeName(color, this.attr); this.anim.setType(this.type); }
   update(dt) {
     this.anim.update(dt);
-    if (!this.exploding && !this.moving) {
-      this.idleTimer -= dt;
-      if (this.idleTimer <= 0) {
-        this.idleTimer = randRange(3, 9);
-        const alt = ['Idle02', 'Idle03'].filter((n) => this.scene.G.lib.get(this.type, n));
-        if (alt.length && this.anim.name === 'Idle01') {
-          const pick = alt[randInt(0, alt.length - 1)];
-          this.anim.play(pick, false, () => this.anim.play('Idle01', true));
-        }
-      }
+    // GamePiece::animationFinished (disassembled): once an idle animation ends, every piece except Color blobs / Mega blobs / Changers
+    // rolls r = rand()/RAND_MAX: r < 0.8 -> Idle01, r < 0.95 -> Idle02, else Idle03 (Idle01/02 = 18 frames, Idle03 = 56 frames at 1/12s)
+    if (!this.exploding && this.attr !== ATTR.Color && this.attr !== ATTR.MegaColor && this.attr !== ATTR.Changer) {
+      const a = this.anim, idle = a.name === 'Idle01' || a.name === 'Idle02' || a.name === 'Idle03';
+      if (idle && a.loop) this.idleNext();   // other code resumes with play('Idle01', true): turn that into the real chain
     }
     if (this.shake > 0) this.shake -= dt;
   }
