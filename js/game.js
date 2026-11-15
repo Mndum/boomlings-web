@@ -954,7 +954,7 @@ export class PlayScene {
     // bottom panel: bottomBG anchored bottom-centre, scaled to a 91pt height (its top is the progress bar's centre)
     const bh = ui.size('bottomBG_001.png')[1] * (182 / ui.size('bottomBG_001.png')[1]);
     // shadow the panel casts on the last board row, then the panel itself (clipped to start at the board's bottom edge)
-    { const by = GRID_Y + GRID * CELL, lt = by + 10.07, g = ctx.createLinearGradient(0, lt - 17.6, 0, lt); g.addColorStop(0, 'rgba(20,10,0,0)'); g.addColorStop(1, 'rgba(20,10,0,0.7)'); ctx.fillStyle = g; ctx.fillRect(0, lt - 17.6, W, 17.6);
+    { const by = GRID_Y + GRID * CELL, lt = by + 10.07, g = ctx.createLinearGradient(0, lt - 11.3, 0, lt); g.addColorStop(0, 'rgba(20,10,0,0)'); g.addColorStop(1, 'rgba(20,10,0,0.7)'); ctx.fillStyle = g; ctx.fillRect(0, lt - 11.3, W, 11.3);
       ctx.save(); ctx.beginPath(); ctx.rect(0, lt, W, H - lt); ctx.clip(); ui.drawRect(ctx, 'bottomBG_001.png', 0, by - 3.56, W, H - (by - 3.56)); ctx.restore(); }
     // top bar anchored (0.5, 1) at (160, 480)
     ui.draw(ctx, 'topBar_001.png', W / 2, -0.5, { ay: 0 });
