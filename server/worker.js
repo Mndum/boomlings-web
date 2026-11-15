@@ -152,6 +152,28 @@ const routes = {
     return J({ pranks: q.results.map((r) => { try { return JSON.parse(r.data); } catch (e) { return null; } }).filter(Boolean) });
   },
 
+  // ---- public reviews (the /rate/ page): no sign-in; one review per browser id, at most 5 per IP per day
+  async 'GET /api/ratings'(req, env) {
+    const [agg, dist, rows] = await Promise.all([
+      env.DB.prepare('SELECT COUNT(*) n, AVG(stars) avg FROM ratings').first(),
+      env.DB.prepare('SELECT stars, COUNT(*) n FROM ratings GROUP BY stars').all(),
+      env.DB.prepare("SELECT name, stars, comment, at FROM ratings WHERE comment IS NOT NULL AND comment != '' ORDER BY at DESC LIMIT 30").all(),
+    ]);
+    const d = [0, 0, 0, 0, 0]; dist.results.forEach((r) => { if (r.stars >= 1 && r.stars <= 5) d[r.stars - 1] = r.n; });
+    return J({ count: agg.n, average: agg.n ? Math.round(agg.avg * 10) / 10 : 0, distribution: d, reviews: rows.results });
+  },
+  async 'POST /api/rate'(req, env) {
+    const b = await body(req, 3000), stars = Math.floor(+b.stars);
+    if (!(stars >= 1 && stars <= 5)) return bad('Pick 1 to 5 stars');
+    const cid = String(b.cid || ''); if (!/^[a-f0-9]{32}$/.test(cid)) return bad('Bad request');
+    const name = String(b.name || '').replace(/[<>]/g, '').trim().slice(0, 20), comment = String(b.comment || '').replace(/[<>]/g, '').trim().slice(0, 500);
+    const ip = await sha256((req.headers.get('cf-connecting-ip') || 'local') + '|boomlings'), t = now();
+    const mine = await env.DB.prepare('SELECT 1 FROM ratings WHERE cid = ?').bind(cid).first();
+    if (!mine && (await env.DB.prepare('SELECT COUNT(*) n FROM ratings WHERE ip_hash = ? AND at > ?').bind(ip, t - 86400).first()).n >= 5) return bad('Too many reviews from this connection today. Try again tomorrow.', 429);
+    await env.DB.prepare('INSERT INTO ratings (cid, stars, name, comment, at, ip_hash) VALUES (?1, ?2, ?3, ?4, ?5, ?6) ON CONFLICT(cid) DO UPDATE SET stars = ?2, name = ?3, comment = ?4, at = ?5').bind(cid, stars, name || null, comment || null, t, ip).run();
+    return J({ ok: true });
+  },
+
   // ---- referral codes
   async 'POST /api/redeem'(req, env, u) {
     const { code } = await body(req, 500);
@@ -179,7 +201,7 @@ const routes = {
   },
 };
 
-const PUBLIC = new Set(['POST /api/register', 'POST /api/login', 'GET /api/iap']);
+const PUBLIC = new Set(['POST /api/register', 'POST /api/login', 'GET /api/iap', 'GET /api/ratings', 'POST /api/rate']);
 const OPTIONAL_AUTH = new Set(['GET /api/leaderboard']);
 
 async function redeem(env, userId, codeRaw) {

@@ -4,7 +4,7 @@ import { Screen } from './screens.js';
 import { recruit, enterCode } from './account.js';
 
 const Y = (y) => 1013.333 - 2 * y;
-const URL = { fb: 'https://www.facebook.com/p/RobTop-Games-100081802506994/', tw: 'https://x.com/RobTopGames', yt: 'https://www.youtube.com/channel/UCz_yk8mDSAnxJq0ar66L4sw' };
+const URL = { rate: location.origin + '/rate/', fb: 'https://www.facebook.com/p/RobTop-Games-100081802506994/', tw: 'https://x.com/RobTopGames', yt: 'https://www.youtube.com/channel/UCz_yk8mDSAnxJq0ar66L4sw' };
 const SOCIAL = [['fb', 'longFacebookBtn_001.png', 398.17, 'sheet'], ['tw', 'longTwitterBtn_001.png', 361.17, 'sheet'], ['yt', 'longYouTubeBtn_001.png', 324.17, 'sheet'], ['rate', 'longRateBtn_001.png', 287.17, 'sheet2']];
 
 export class FreeGoldScreen extends Screen {
@@ -13,7 +13,6 @@ export class FreeGoldScreen extends Screen {
   // FreeGoldLayer::onFacebook / onTwitter / onYouTube: remember which one, open the page; returnedFromWeb pays the reward once
   open(k) {
     this.pending = k;
-    if (k === 'rate') { setTimeout(() => this.returnedFromWeb(), 0); return; }   // the offline build's page opener only "resumes" the app
     try { window.open(URL[k], '_blank', 'noopener'); } catch (e) { setTimeout(() => this.returnedFromWeb(), 0); }
   }
   // FreeGoldLayer::returnedFromWeb + giveRewardForWeb: kUnlock<X> once, 100 gold (200 for rating), "Gold Reward!" alert

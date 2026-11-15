@@ -152,6 +152,7 @@
     <a href="#/players" data-t="players"><span class="ic">👥</span>Players</a>
     <a href="#/live" data-t="live"><span class="ic">🎭</span>Live &amp; Pranks</a>
     <a href="#/leaderboard" data-t="leaderboard"><span class="ic">🏆</span>Leaderboard</a>
+    <a href="#/ratings" data-t="ratings"><span class="ic">⭐</span>Reviews</a>
     <a href="#/log" data-t="log"><span class="ic">📋</span>Activity</a>
     <div class="grow"></div>
     <button class="out" id="signOut">Sign out</button>
@@ -243,7 +244,7 @@ function route() {
   const [, tab = 'overview', id] = location.hash.split('/');
   document.querySelectorAll('nav a').forEach((a) => a.classList.toggle('on', a.dataset.t === tab));
   liveStop();
-  ({ overview, players, live, leaderboard, log: logView }[tab] || overview)();
+  ({ overview, players, live, leaderboard, ratings, log: logView }[tab] || overview)();
   if (tab === 'players' && id) openPlayer(+id); else closeSheet(true);
 }
 window.addEventListener('hashchange', route);
@@ -405,6 +406,16 @@ async function leaderboard() {
   } catch (e) { fail(e); }
 }
 async function rmScore(id, name) { if (await dialog({ title: 'Remove ' + name + ' from the leaderboard?', text: 'Their best score is deleted.', ok: 'Remove', danger: true })) api('POST', 'action', { id, action: 'clearScore' }).then(() => { toast('Removed'); leaderboard(); }).catch(fail); }
+
+// ---- Reviews from the public /rate/ page
+async function ratings() {
+  const m = $('#main'); m.innerHTML = '<h2>Reviews</h2><p class="sub">What people wrote on your public rating page (<a class="link" href="/rate/" target="_blank">/rate/</a>).</p><div class="card" id="rv"><div class="empty">Loading…</div></div>';
+  try {
+    const j = await api('GET', 'ratings');
+    $('#rv').innerHTML = `<h3>${j.count} review${j.count === 1 ? '' : 's'} · average ${j.average || '—'} ★</h3>` + (j.ratings.length ? j.ratings.map((r) => `<div class="row"><div class="grow"><div class="nm">${'★'.repeat(r.stars)}${'☆'.repeat(5 - r.stars)} <span class="mute">${esc(r.name || 'Anonymous')} · ${ago(r.at)}</span></div>${r.comment ? `<div>${esc(r.comment)}</div>` : ''}</div><button class="btn danger" data-id="${r.id}">Delete</button></div>`).join('') : '<div class="empty">No reviews yet.</div>');
+    $('#rv').querySelectorAll('button[data-id]').forEach((b) => b.onclick = async () => { if (await dialog({ title: 'Delete this review?', ok: 'Delete', danger: true })) api('POST', 'deleteRating', { id: +b.dataset.id }).then(() => { toast('Deleted'); ratings(); }).catch(fail); });
+  } catch (e) { fail(e); }
+}
 
 // ---- Activity log
 async function logView() {

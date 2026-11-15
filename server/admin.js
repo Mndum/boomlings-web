@@ -80,6 +80,17 @@ const admin = {
     return J({ log: (await env.DB.prepare('SELECT at, action, target_id, target_name, detail FROM admin_log ORDER BY id DESC LIMIT 200').all()).results });
   },
 
+  async 'GET ratings'(req, env) {
+    const [agg, rows] = await Promise.all([env.DB.prepare('SELECT COUNT(*) n, AVG(stars) avg FROM ratings').first(), env.DB.prepare('SELECT id, stars, name, comment, at FROM ratings ORDER BY at DESC LIMIT 200').all()]);
+    return J({ count: agg.n, average: agg.n ? Math.round(agg.avg * 10) / 10 : 0, ratings: rows.results });
+  },
+  async 'POST deleteRating'(req, env) {
+    const b = await body(req, 200);
+    await env.DB.prepare('DELETE FROM ratings WHERE id = ?').bind(+b.id).run();
+    await logAct(env, 'delete review', null, '#' + (+b.id));
+    return J({ ok: true });
+  },
+
   // who is playing right now (heartbeat within the last 20s), with their screen, score and snapshot
   async 'GET live'(req, env, url) {
     const only = +url.searchParams.get('id') || 0;

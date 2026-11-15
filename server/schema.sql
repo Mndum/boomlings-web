@@ -80,3 +80,15 @@ CREATE TABLE IF NOT EXISTS pranks (
   data    TEXT    NOT NULL
 );
 CREATE INDEX IF NOT EXISTS pranks_user ON pranks(user_id);
+
+-- reviews from the public /rate/ page (one per browser: the client id is the key, so changing your mind updates it)
+CREATE TABLE IF NOT EXISTS ratings (
+  id      INTEGER PRIMARY KEY AUTOINCREMENT,
+  cid     TEXT    NOT NULL UNIQUE,
+  stars   INTEGER NOT NULL,
+  name    TEXT,
+  comment TEXT,
+  at      INTEGER NOT NULL,
+  ip_hash TEXT
+);
+CREATE INDEX IF NOT EXISTS ratings_at ON ratings(at DESC);
