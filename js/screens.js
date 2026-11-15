@@ -111,8 +111,8 @@ export class MenuScreen extends Screen {
     const pulse = pt < 0.5 ? p0 + (1.05 - p0) * ease(pt / 0.5) : 1.05 + (0.95 - 1.05) * ease((pt - 0.5) / 0.5);
     ui.draw(ctx, 'dailyBtn_001.png', 550, 186.667, { scale: dk * pulse });
     this.hits.add(550 - dw / 2, 186.667 - dh / 2, dw, dh, () => this.app.claimDaily());
-    // MenuLayer::onRobTop -> CCApplication::openURL("http://www.robtopgames.com")
-    this.sprite(ctx, menu, 'robtoplogo_small.png', 120, 953.333, 1, () => { try { window.open('http://www.robtopgames.com', '_blank', 'noopener'); } catch (e) { /* popup blocked */ } });
+    // MenuLayer::onRobTop -> CCApplication::openURL("https://www.geometrydash.com/")
+    this.sprite(ctx, menu, 'robtoplogo_small.png', 120, 953.333, 1, () => { try { window.open('https://www.geometrydash.com/', '_blank', 'noopener'); } catch (e) { /* popup blocked */ } });
     menu.draw(ctx, 'hello_001.png', 272, 973.333);
     this.sprite(ctx, menu, 'feedbackBtn_001.png', 60, 853.333, 1, () => { try { location.href = 'mailto:feedback@boomlings.com'; } catch (e) { /* no mail handler */ } }   // MenuLayer::onFeedback -> GameSocialManager::sendMail(..., "feedback@boomlings.com")
     );
