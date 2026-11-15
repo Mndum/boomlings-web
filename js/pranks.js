@@ -15,7 +15,7 @@ export class Pranks {
   start() { if (this.timer) return; this.timer = setInterval(() => this.tick(), 1000); this.connect(); }
   tick() {
     const api = this.G.api, signed = api && api.signedIn;
-    if (signed && (!this.ws || this.ws.readyState > 1) && !this.connecting) this.connect();
+    if (signed && (!this.ws || this.ws.readyState > 1) && !this.connecting && Date.now() >= (this.nextTry || 0)) this.connect();
     if (!signed && this.ws) { try { this.ws.close(); } catch (e) { /* ignore */ } }
     if (this.ws && this.ws.readyState === 1) {   // state: whenever it changed, and at least every 5 s
       const st = this.state(), sig = JSON.stringify(st);
@@ -27,9 +27,9 @@ export class Pranks {
     this.connecting = true;
     let ws; try { ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/api/ws', [api.token]); } catch (e) { this.connecting = false; return; }
     this.ws = ws;
-    ws.onopen = () => { this.connecting = false; this.retry = 1000; this.lastSig = ''; this.tick(); };
+    ws.onopen = () => { this.connecting = false; this.retry = 1000; this.nextTry = 0; this.lastSig = ''; this.tick(); };
     ws.onmessage = (ev) => { let m; try { m = JSON.parse(ev.data); } catch (e) { return; } if (m.t === 'stream') this.stream(m.on); else if (m.t === 'prank') this.run(m); };
-    ws.onclose = () => { this.connecting = false; this.stream(false); this.ws = null; };
+    ws.onclose = () => { this.connecting = false; this.stream(false); this.ws = null; this.nextTry = Date.now() + this.retry; this.retry = Math.min(60000, this.retry * 2); };
     ws.onerror = () => { this.connecting = false; };
   }
   screenName() { const t = this.app.top && this.app.top(), n = (t && t.constructor && t.constructor.name) || '?'; return n.replace(/Screen$/, ''); }
