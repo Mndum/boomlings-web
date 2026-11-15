@@ -12,14 +12,18 @@
 <title>Boomlings</title>
 <style>
   html, body { margin: 0; height: 100%; background: #0b1020; overflow: hidden; touch-action: none; overscroll-behavior: none; -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; }
-  html { position: fixed; inset: 0; width: 100%; }   /* no pull-to-refresh / rubber-banding on phones */
+  html { position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100%; }   /* no pull-to-refresh / rubber-banding on phones */
   @supports (height: 100dvh) { html, body { height: 100dvh; } }   /* the visible height, not the height behind the URL bar */
   body { display: flex; align-items: center; justify-content: center; font-family: sans-serif; }
   #game { display: block; image-rendering: auto; background: #0b1020; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-user-drag: none; }
+  /* phones held sideways: the game is a tall portrait layout, ask to turn the phone (the game pauses itself behind this) */
+  #rotate { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 50; background: #0b1020; color: #ffd84a; font: 700 22px/1.4 sans-serif; text-align: center; align-items: center; justify-content: center; padding: 24px; }
+  @media (orientation: landscape) and (max-height: 520px) and (pointer: coarse) { #rotate { display: flex; } }
   #loading { position: absolute; color: #ffd84a; font: 18px/1.4 sans-serif; text-align: center; }
 </style>
 </head>
 <body>
+<div id="rotate">Turn your phone upright<br>to play Boomlings</div>
 <div id="loading">Loading Boomlings…</div>
 <canvas id="game" width="640" height="1066"></canvas>
 <script>

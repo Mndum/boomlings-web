@@ -3,15 +3,25 @@
 export class AudioMan {
   constructor(base) { this.base = base; this.buf = {}; this.music = null; this.musicName = null; this.enabled = true; this.musicOn = true; this.unlocked = false; this.mv = 1; this.sv = 1; this.ac = null; }
   ctx() {
-    if (!this.ac) { const C = window.AudioContext || window.webkitAudioContext; if (!C) return null; try { this.ac = new C(); } catch (e) { return null; } }
+    if (!this.ac) {
+      const C = window.AudioContext || window.webkitAudioContext; if (!C) return null;
+      try { this.ac = new C(); } catch (e) { return null; }
+      // iPhones: play through the silent/ringer switch like a game, not like a ringtone (iOS 16.4+)
+      try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) { /* ignore */ }
+    }
     return this.ac;
+  }
+  // iPhones (and some older Android WebViews) cannot decode .ogg: use the .mp3 copy of the same sound
+  file(name) {
+    if (this.ogg === undefined) { try { this.ogg = !!new Audio().canPlayType('audio/ogg; codecs="vorbis"') && !/iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent); } catch (e) { this.ogg = false; } }
+    return this.base + (this.ogg ? name : name.replace(/\.ogg$/, '.mp3'));
   }
   preload(names) { for (const n of names) this.load(n); }
   // decoded AudioBuffer promise, fetched once
   load(name) {
     if (!this.buf[name]) {
       const ac = this.ctx();
-      this.buf[name] = !ac ? Promise.resolve(null) : fetch(this.base + name).then((r) => r.arrayBuffer()).then((d) => new Promise((ok, no) => ac.decodeAudioData(d, ok, no))).catch(() => null);
+      this.buf[name] = !ac ? Promise.resolve(null) : fetch(this.file(name)).then((r) => r.arrayBuffer()).then((d) => new Promise((ok, no) => ac.decodeAudioData(d, ok, no))).catch(() => null);
     }
     return this.buf[name];
   }
@@ -45,5 +55,10 @@ export class AudioMan {
   suspend() { if (this.ac && this.ac.state === 'running') this.ac.suspend().catch(() => {}); }
   // phones suspend (or "interrupt") the audio context when the page loses focus; any touch wakes it again
   resume() { if (this.unlocked && this.ac && this.ac.state !== 'running') this.ac.resume().catch(() => {}); }
-  unlock() { this.unlocked = true; const ac = this.ctx(); if (ac && ac.state === 'suspended') ac.resume().catch(() => {}); }
+  // must run inside a touch/click: resumes the context and plays one silent sample, which is what unlocks sound on iOS
+  unlock() {
+    this.unlocked = true; const ac = this.ctx(); if (!ac) return;
+    try { const s = ac.createBufferSource(); s.buffer = ac.createBuffer(1, 1, 22050); s.connect(ac.destination); s.start(0); } catch (e) { /* ignore */ }
+    if (ac.state !== 'running') { const p = ac.resume(); if (p && p.catch) p.catch(() => {}); }
+  }
 }

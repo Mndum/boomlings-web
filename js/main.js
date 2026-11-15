@@ -1,3 +1,4 @@
+import './compat.js';
 import { Atlas } from './atlas.js';
 import { BMFont } from './bmfont.js';
 import { AnimLibrary } from './anim.js';
@@ -280,7 +281,20 @@ canvas.addEventListener('pointermove', (ev) => { if (!dragging || ev.pointerId !
 const endDrag = (ev) => { if (!dragging || ev.pointerId !== activeId) return; dragging = false; activeId = null; const top = app.top(); if (top) { const [x, y] = toCanvas(ev); top.up(x, y); } };
 canvas.addEventListener('pointerup', endDrag);
 canvas.addEventListener('pointercancel', () => { dragging = false; activeId = null; });
+// iOS only lets sound start from the END of a touch (not its start): ask again when the finger lifts while the sound is still locked
+const kick = () => { if (G.audio.unlocked && G.audio.ac && G.audio.ac.state !== 'running') G.audio.unlock(); };
+canvas.addEventListener('pointerup', kick); canvas.addEventListener('touchend', kick, { passive: true }); canvas.addEventListener('click', kick);
+// Android back button / swipe: act like Escape (back one screen, pause in a game) instead of leaving the game; from the main menu it leaves as normal
+try {
+  history.pushState({ g: 1 }, '');
+  window.addEventListener('popstate', () => {
+    const top = app.top();
+    if (top && !(top instanceof MenuScreen) && !app.fade) { history.pushState({ g: 1 }, ''); window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })); }
+    else history.back();
+  });
+} catch (e) { /* no history API */ }
 // leaving the tab / app (phone call, app switch, screen off): pause a running game and silence the sound; coming back restores the sound
+window.addEventListener('resize', () => { if (matchMedia('(orientation: landscape) and (max-height: 520px) and (pointer: coarse)').matches && app.top() instanceof PlayScreen) app.pause(); });   // phone turned sideways mid-run
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { const top = app.top(); if (top instanceof PlayScreen) app.pause(); G.audio.suspend(); }
   else G.audio.resume();
