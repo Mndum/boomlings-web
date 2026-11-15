@@ -1,12 +1,15 @@
-// cocos2d ParticleSystemQuad port: loads the game's particle plists (gravity and radius emitters) and renders them
-// on the canvas. Sizes/speeds are in points, so everything is multiplied by 2 for the 640x960 canvas.
+// cocos2d-x 2.x CCParticleSystemQuad, ported from the game's own decompiled engine (CCParticleSystem::initParticle / ::update): loads the game's
+// particle plists (gravity and radius emitters) and renders them on the canvas. Sizes/speeds are in points, so everything is multiplied by 2 for
+// the 640x960 canvas. The system is stepped at the game's own 60 fps (fixed 1/60 s steps), because the emission rules depend on the frame step.
 import { parsePlist, fetchText } from './plist.js';
 
 const NAMES = ['starEffect', 'chargeEffect', 'glitterEffect', 'stoneHit', 'trailEffect', 'Skull_w_01', 'Skull_w_02', 'Skull_w_03', 'Ice_w_01', 'Ice_w_02', 'levelComplete01', 'levelComplete02', 'highscoreEffect01', 'highscoreEffect02', 'lvlupEffect'];
-const rnd = () => Math.random() * 2 - 1;
+const rnd = () => Math.random() * 2 - 1;   // CCRANDOM_MINUS1_1
+const clamp01 = (v) => Math.max(0, Math.min(1, v));
+const DEG = Math.PI / 180, STEP = 1 / 60;
 
 export class Particles {
-  constructor(defs, atlas) { this.defs = defs; this.atlas = atlas; this.list = []; this.tint = {}; }
+  constructor(defs, atlas) { this.defs = defs; this.atlas = atlas; this.list = []; this.tint = {}; this.acc = 0; }
   static async load(base, atlas) {
     const defs = {};
     await Promise.all(NAMES.map(async (n) => { try { defs[n] = parsePlist(await fetchText(base + n + '.plist')); } catch (e) { /* optional */ } }));
@@ -15,53 +18,79 @@ export class Particles {
   // Starts an emitter at canvas position (x, y). Returns it; call .stop() on endless ones (duration -1).
   spawn(name, x, y, o = {}) {
     const d = this.defs[name]; if (!d) return null;
-    const e = { d, x, y, t: 0, acc: 0, parts: [], stopped: false, scale: o.scale ?? 1, color: o.color || null, follow: o.follow || null, alive: o.alive || null, layer: o.layer || 'top', free: !!o.free, stop() { this.stopped = true; } };
-    e.rate = d.maxParticles / Math.max(0.05, d.particleLifespan || 1);
+    const e = { d, x, y, elapsed: 0, counter: 0, parts: [], stopped: false, scale: o.scale ?? 1, color: o.color || null, follow: o.follow || null, alive: o.alive || null, layer: o.layer || 'top', free: !!o.free, stop() { this.stopped = true; } };
+    // emissionRate = totalParticles / lifespan; a lifespan of 0 gives an infinite rate: the system refills to its maximum every frame
+    e.rate = d.particleLifespan > 0 ? d.maxParticles / d.particleLifespan : Infinity;
     this.list.push(e);
     return e;
   }
+  // CCParticleSystem::initParticle. State is kept y-up like cocos; the y flip happens when drawing.
   makeParticle(e) {
-    const d = e.d, life = d.particleLifespan + d.particleLifespanVariance * rnd();
-    if (life <= 0) return null;
-    const p = { ox: e.free ? e.x : null, oy: e.free ? e.y : null, life, age: 0, x: (d.sourcePositionVariancex || 0) * rnd() * 2, y: (d.sourcePositionVariancey || 0) * rnd() * 2 };
-    const ang = ((d.angle + d.angleVariance * rnd()) * Math.PI) / 180;
+    const d = e.d, life = Math.max(0, d.particleLifespan + d.particleLifespanVariance * rnd());
+    const p = { ox: e.free ? e.x : null, oy: e.free ? e.y : null, life };
+    p.x = (d.sourcePositionVariancex || 0) * rnd();   // the plist's sourcePosition becomes the node position (the game sets it itself), so only the variance remains
+    p.y = (d.sourcePositionVariancey || 0) * rnd();
+    p.c = [clamp01(d.startColorRed + d.startColorVarianceRed * rnd()), clamp01(d.startColorGreen + d.startColorVarianceGreen * rnd()), clamp01(d.startColorBlue + d.startColorVarianceBlue * rnd()), clamp01(d.startColorAlpha + d.startColorVarianceAlpha * rnd())];
+    const c1 = [clamp01(d.finishColorRed + d.finishColorVarianceRed * rnd()), clamp01(d.finishColorGreen + d.finishColorVarianceGreen * rnd()), clamp01(d.finishColorBlue + d.finishColorVarianceBlue * rnd()), clamp01(d.finishColorAlpha + d.finishColorVarianceAlpha * rnd())];
+    p.dc = life > 0 ? c1.map((v, i) => (v - p.c[i]) / life) : [0, 0, 0, 0];
+    p.size = Math.max(0, d.startParticleSize + d.startParticleSizeVariance * rnd());
+    p.dsize = d.finishParticleSize === -1 || life <= 0 ? 0 : (Math.max(0, d.finishParticleSize + (d.finishParticleSizeVariance || 0) * rnd()) - p.size) / life;
+    p.rot = d.rotationStart + d.rotationStartVariance * rnd();
+    p.drot = life > 0 ? (d.rotationEnd + d.rotationEndVariance * rnd() - p.rot) / life : 0;
+    const a = (d.angle + d.angleVariance * rnd()) * DEG;
     if (d.emitterType === 1) {
-      p.a = ang; p.r0 = d.maxRadius + d.maxRadiusVariance * rnd(); p.r1 = d.minRadius + d.minRadiusVariance * rnd();
-      p.rot = (d.rotatePerSecond + d.rotatePerSecondVariance * rnd()) * Math.PI / 180;
+      p.a = a; p.radius = d.maxRadius + d.maxRadiusVariance * rnd();
+      p.dradius = d.minRadius === -1 || life <= 0 ? 0 : (d.minRadius + d.minRadiusVariance * rnd() - p.radius) / life;
+      p.spin = (d.rotatePerSecond + d.rotatePerSecondVariance * rnd()) * DEG;
+      p.x = 0; p.y = 0;
     } else {
       const sp = d.speed + d.speedVariance * rnd();
-      p.vx = Math.cos(ang) * sp; p.vy = -Math.sin(ang) * sp; // y flipped: cocos is y-up
+      p.dx = Math.cos(a) * sp; p.dy = Math.sin(a) * sp;
+      p.rad = d.radialAcceleration + d.radialAccelVariance * rnd(); p.tan = d.tangentialAcceleration + d.tangentialAccelVariance * rnd();
     }
-    p.s0 = Math.max(0, d.startParticleSize + d.startParticleSizeVariance * rnd());
-    p.s1 = Math.max(0, d.finishParticleSize + (d.finishParticleSizeVariance || 0) * rnd());
-    const c0 = [d.startColorRed + d.startColorVarianceRed * rnd(), d.startColorGreen + d.startColorVarianceGreen * rnd(), d.startColorBlue + d.startColorVarianceBlue * rnd(), d.startColorAlpha + d.startColorVarianceAlpha * rnd()];
-    const c1 = [d.finishColorRed + d.finishColorVarianceRed * rnd(), d.finishColorGreen + d.finishColorVarianceGreen * rnd(), d.finishColorBlue + d.finishColorVarianceBlue * rnd(), d.finishColorAlpha + d.finishColorVarianceAlpha * rnd()];
-    p.c0 = c0; p.c1 = c1;
     return p;
   }
-  update(dt) {
+  // CCParticleSystem::update for one 1/60 s step
+  step(dt) {
     for (const e of this.list) {
-      const d = e.d;
-      e.t += dt;
+      const d = e.d, max = d.maxParticles;
       if (e.alive && !e.stopped && !e.alive()) e.stop();
       if (e.follow) { const f = e.follow(); if (f) { e.x = f[0]; e.y = f[1]; } }
-      const active = !e.stopped && (d.duration < 0 || e.t < d.duration);
-      if (active) {
-        e.acc += dt * e.rate;
-        // a short-duration burst emits its full count at once (cocos behaviour for tiny durations)
-        let n = Math.floor(e.acc); e.acc -= n;
-        if (d.duration >= 0 && d.duration <= 0.15 && e.t - dt <= 0) n = Math.max(n, d.maxParticles);
-        while (n-- > 0 && e.parts.length < d.maxParticles * 2) { const p = this.makeParticle(e); if (p) e.parts.push(p); }
+      if (!e.stopped) {
+        const every = e.rate === Infinity ? 0 : 1 / e.rate;
+        if (e.parts.length < max) e.counter += dt;   // no build-up while full (cocos issue #1201)
+        while (e.parts.length < max && e.counter > every) { e.parts.push(this.makeParticle(e)); e.counter -= every; }
+        e.elapsed += dt;
+        if (d.duration !== -1 && d.duration < e.elapsed) e.stopped = true;   // stopSystem
       }
+      const keep = [];
       for (const p of e.parts) {
-        p.age += dt;
-        if (d.emitterType === 1) p.a += p.rot * dt;
-        else { p.vx += (d.gravityx || 0) * dt; p.vy -= (d.gravityy || 0) * dt; p.x += p.vx * dt; p.y += p.vy * dt; }
+        p.life -= dt;
+        if (p.life <= 0) continue;   // dead on arrival (lifespan clamped to 0) or out of time
+        if (d.emitterType === 1) {
+          p.a += p.spin * dt; p.radius += p.dradius * dt;
+          p.x = -Math.cos(p.a) * p.radius; p.y = -Math.sin(p.a) * p.radius;
+        } else {
+          let rx = 0, ry = 0;
+          if (p.x || p.y) { const l = Math.hypot(p.x, p.y); rx = p.x / l; ry = p.y / l; }
+          const tx = -ry * p.tan, ty = rx * p.tan;   // tangential: the radial vector turned a quarter
+          p.dx += (rx * p.rad + tx + (d.gravityx || 0)) * dt; p.dy += (ry * p.rad + ty + (d.gravityy || 0)) * dt;
+          p.x += p.dx * dt; p.y += p.dy * dt;
+        }
+        for (let i = 0; i < 4; i++) p.c[i] += p.dc[i] * dt;
+        p.size = Math.max(0, p.size + p.dsize * dt);
+        p.rot += p.drot * dt;
+        keep.push(p);
       }
-      e.parts = e.parts.filter((p) => p.age < p.life);
-      e.dead = !active && !e.parts.length;
+      e.parts = keep;
+      e.dead = e.stopped && !e.parts.length;
     }
     this.list = this.list.filter((e) => !e.dead);
+  }
+  update(dt) {
+    this.acc += Math.min(dt, 0.25);
+    for (let n = 0; this.acc >= STEP && n < 15; n++) { this.step(STEP); this.acc -= STEP; }
+    if (this.acc >= STEP) this.acc = 0;
   }
   draw(ctx, layer = 'top') {
     for (const e of this.list) {
@@ -71,17 +100,13 @@ export class Particles {
       const additive = d.blendFuncDestination === 1;
       ctx.save(); ctx.globalCompositeOperation = additive ? 'lighter' : 'source-over';
       for (const p of e.parts) {
-        const k = p.age / p.life;
-        let px, py;
-        if (d.emitterType === 1) { const r = p.r0 + (p.r1 - p.r0) * k; px = Math.cos(p.a) * r; py = -Math.sin(p.a) * r; } else { px = p.x; py = p.y; }
-        const c = p.c0.map((v, i) => v + (p.c1[i] - v) * k), size = (p.s0 + (p.s1 - p.s0) * k) * e.scale * 2;
+        const size = p.size * e.scale * 2;   // the quad is a square of `size` points
         if (size < 0.5) continue;
-        const col = e.color || c;
-        ctx.globalAlpha = Math.max(0, Math.min(1, c[3]));
-        const name = img, s = this.atlas.frames[name], [w, h] = [s.sw, s.sh];
-        // tint by drawing the white particle through a small offscreen colour multiply (cheap: use filter-free approach)
-        const tinted = this.tinted(name, col);
-        ctx.drawImage(tinted, (p.ox ?? e.x) + px * e.scale * 2 - size / 2, (p.oy ?? e.y) + py * e.scale * 2 - size / 2, size, size * (h / w));
+        const col = e.color || p.c, cx = (p.ox ?? e.x) + p.x * e.scale * 2, cy = (p.oy ?? e.y) - p.y * e.scale * 2;
+        ctx.globalAlpha = clamp01(p.c[3]);
+        ctx.save(); ctx.translate(cx, cy); if (p.rot) ctx.rotate(p.rot * DEG);
+        ctx.drawImage(this.tinted(img, col), -size / 2, -size / 2, size, size);
+        ctx.restore();
       }
       ctx.restore();
     }
