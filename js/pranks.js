@@ -56,7 +56,9 @@ export class Pranks {
       case 'vibrate': try { if (navigator.vibrate) navigator.vibrate(Array.from({ length: secs * 2 }, (_, i) => (i % 2 ? 150 : 250))); } catch (e) { /* ignore */ } return;
       case 'chipmunk': case 'slowmo': this.musicRate(p.type === 'chipmunk' ? 2 : 0.5, secs); return;
       case 'emojirain': this.emojiRain(secs); return;
-      case 'fakecrash': this.overlay('<div style="background:#2b2b2b;color:#eee;border-radius:14px;padding:20px;width:min(80vw,300px);font:16px/1.4 sans-serif;box-shadow:0 8px 30px #000a"><b style="font-size:19px">Boomlings has stopped</b><p style="margin:10px 0 18px;opacity:.8">The app keeps crashing. Do you want to close it?</p><div style="text-align:right;color:#6cf;font-weight:700"><span data-x style="margin-right:22px;cursor:pointer">WAIT</span><span data-x style="cursor:pointer">CLOSE APP</span></div></div>', secs, 'rgba(0,0,0,.55)', true); return;
+      case 'fakecrashpc': case 'fakecrash': this.overlay('<div style="background:#f0f0f0;color:#000;border:1px solid #2a6;box-shadow:0 8px 30px #000a;width:min(88vw,420px);font:14px/1.4 Segoe UI,Tahoma,sans-serif"><div style="background:#fff;padding:7px 10px;display:flex;justify-content:space-between"><span>Boomlings</span><b data-x style="cursor:pointer;padding:0 6px">X</b></div><div style="padding:18px 16px;display:flex;gap:14px;align-items:center;background:#fff"><div style="font-size:34px;color:#c00">&#9940;</div><div><b style="font-size:16px;color:#003399">Boomlings.exe has stopped working</b><br>Windows is checking for a solution to the problem...</div></div><div style="padding:10px 14px;text-align:right;background:#f0f0f0"><span data-x style="display:inline-block;border:1px solid #707070;background:#e1e1e1;padding:3px 16px;cursor:pointer">Close program</span></div></div>', secs, 'rgba(0,0,0,.45)', true); return;
+      case 'fakecrashandroid': this.overlay('<div style="background:#2b2b2b;color:#eee;border-radius:14px;padding:20px;width:min(80vw,300px);font:16px/1.4 Roboto,sans-serif;box-shadow:0 8px 30px #000a"><b style="font-size:19px">Boomlings keeps stopping</b><p style="margin:10px 0 18px;opacity:.8">Do you want to close the app, or send feedback?</p><div style="text-align:right;color:#6cf;font-weight:700"><span data-x style="margin-right:22px;cursor:pointer">APP INFO</span><span data-x style="cursor:pointer">CLOSE APP</span></div></div>', secs, 'rgba(0,0,0,.55)', true); return;
+      case 'fakecrashios': this.overlay('<div style="background:rgba(246,246,246,.96);color:#000;border-radius:14px;width:min(72vw,270px);text-align:center;font:-apple-system,system-ui,sans-serif;font:15px/1.35 -apple-system,system-ui,sans-serif;box-shadow:0 8px 30px #0008"><div style="padding:18px 16px 14px"><b style="font-size:17px">&#8220;Boomlings&#8221; Quit Unexpectedly</b><p style="margin:6px 0 0;font-size:13px">Do you want to send a report to the developer?</p></div><div data-x style="border-top:1px solid #c8c8c8;padding:11px;color:#007aff;cursor:pointer">Don&#8217;t Send</div><div data-x style="border-top:1px solid #c8c8c8;padding:11px;color:#007aff;font-weight:600;cursor:pointer">Send</div></div>', secs, 'rgba(0,0,0,.4)', true); return;
       case 'fakeupdate': this.overlay('<div style="text-align:center;color:#fff;font:700 20px/1.6 sans-serif"><div style="font-size:46px">⚙️</div>Installing update<br><div style="margin:14px auto;width:min(70vw,260px);height:14px;border:2px solid #fff;border-radius:9px;overflow:hidden"><div style="width:99%;height:100%;background:#4c8"></div></div><span style="font-size:16px;opacity:.8">99% - please do not close the game</span></div>', secs, '#0b1020', false); return;
       case 'fakeban': this.app.dialog('Account suspended', 'Your account was banned for being too good at Boomlings. Contact support.', [['OK', null]]); setTimeout(() => this.app.toast('Just kidding :)', 'You are not banned', 'getAch001.ogg'), 7000); return;
       case 'fakegold': this.app.toast('+1,000,000 gold!', 'Just kidding :)', 'buyGold001.ogg'); return;
@@ -107,16 +109,19 @@ export class Pranks {
     if (closable) d.querySelectorAll('[data-x]').forEach((b) => b.addEventListener('click', end));
     setTimeout(end, secs * 1000);
   }
-  // falling emojis drawn on a pointer-transparent layer, for `secs` seconds
+  // Boomling blobs falling over the game, drawn on a pointer-transparent layer for `secs` seconds
   emojiRain(secs) {
-    const c = document.createElement('canvas'), W = (c.width = innerWidth), H = (c.height = innerHeight), x = c.getContext('2d');
+    const c = document.createElement('canvas'), W = (c.width = innerWidth), H = (c.height = innerHeight), x = c.getContext('2d'), obj = this.G.obj;
     c.style.cssText = 'position:fixed;top:0;left:0;z-index:39;pointer-events:none';
     document.body.appendChild(c);
-    const E = ['🤡', '🍌', '💣', '🐔', '💩', '🔥', '👀', '🧀'], drops = Array.from({ length: 45 }, () => ({ x: Math.random() * W, y: -Math.random() * H, v: 2 + Math.random() * 5, e: E[(Math.random() * E.length) | 0], s: 24 + Math.random() * 28 }));
+    const C = ['b', 'g', 'o', 'p', 'r', 'y'], names = C.map((k) => 'Block_' + k + '_Charge_001.png').filter((n) => obj && obj.has(n));
+    if (!names.length) { c.remove(); return; }
+    const [bw] = obj.size(names[0]);
+    const drops = Array.from({ length: 40 }, () => { const px = 36 + Math.random() * 56; return { x: Math.random() * W, y: -Math.random() * H, v: 2 + Math.random() * 5, n: names[(Math.random() * names.length) | 0], k: px / bw, r: Math.random() * 6, w: (Math.random() - 0.5) * 0.08 }; });
     const end = performance.now() + secs * 1000;
     const step = () => {
       x.clearRect(0, 0, W, H);
-      for (const d of drops) { d.y += d.v; if (d.y > H + 40) { d.y = -40; d.x = Math.random() * W; } x.font = d.s + 'px serif'; x.fillText(d.e, d.x, d.y); }
+      for (const d of drops) { d.y += d.v; d.r += d.w; if (d.y > H + 60) { d.y = -60; d.x = Math.random() * W; } obj.draw(x, d.n, d.x, d.y, { scale: d.k, rot: d.r }); }
       if (performance.now() < end) requestAnimationFrame(step); else c.remove();
     };
     requestAnimationFrame(step);
