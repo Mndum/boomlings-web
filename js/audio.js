@@ -1,9 +1,13 @@
 // Sound effects + music through the Web Audio API (not <audio> elements), so the browser/OS media player
 // (the "Boomlings - play/pause/next" overlay) never picks the game up. Unlocked by the first user gesture.
 export class AudioMan {
-  constructor(base) { this.base = base; this.buf = {}; this.music = null; this.musicName = null; this.enabled = true; this.musicOn = true; this.unlocked = false; this.mv = 1; this.sv = 1; this.ac = null; this.haptics = true; }
+  constructor(base) { this.base = base; this.buf = {}; this.music = null; this.musicName = null; this.enabled = true; this.musicOn = true; this.unlocked = false; this.mv = 1; this.sv = 1; this.ac = null; this.haptics = true;
+    // iPhones/iPads only let an AudioContext come alive when it is created inside a real tap (touchend/click): make it there, never at page load
+    const ua = navigator.userAgent; this.late = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1); this.gesture = !this.late;
+  }
   ctx() {
     if (!this.ac) {
+      if (!this.gesture) return null;
       const C = window.AudioContext || window.webkitAudioContext; if (!C) return null;
       try { this.ac = new C(); } catch (e) { return null; }
       // iPhones: play through the silent/ringer switch like a game, not like a ringtone (iOS 16.4+)
@@ -16,14 +20,12 @@ export class AudioMan {
     if (this.ogg === undefined) { try { this.ogg = !!new Audio().canPlayType('audio/ogg; codecs="vorbis"') && !/iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent); } catch (e) { this.ogg = false; } }
     return this.base + (this.ogg ? name : name.replace(/\.ogg$/, '.mp3'));
   }
-  preload(names) { for (const n of names) this.load(n); }
+  preload(names) { this.pre = names; for (const n of names) this.load(n); }
   // decoded AudioBuffer promise, fetched once
   load(name) {
-    if (!this.buf[name]) {
-      const ac = this.ctx();
-      this.buf[name] = !ac ? Promise.resolve(null) : fetch(this.file(name)).then((r) => r.arrayBuffer()).then((d) => new Promise((ok, no) => ac.decodeAudioData(d, ok, no))).catch(() => null);
-    }
-    return this.buf[name];
+    if (this.buf[name]) return this.buf[name];
+    const ac = this.ctx(); if (!ac) return Promise.resolve(null);   // iPhone before the first tap: try again later (not cached)
+    return (this.buf[name] = fetch(this.file(name)).then((r) => r.arrayBuffer()).then((d) => new Promise((ok, no) => ac.decodeAudioData(d, ok, no))).catch(() => { delete this.buf[name]; return null; }));
   }
   // Haptics (Android browsers; iPhones have no vibration API): every game sound has a matching buzz, so taps, pops, blasts and rewards all feel right
   buzz(name) {
@@ -55,7 +57,7 @@ export class AudioMan {
     if (this.musicName === name && this.music) return;
     this.stopMusic();
     this.musicName = name;
-    const ac = this.ctx(); if (!this.musicOn || !this.unlocked || !ac) return;
+    const ac = this.ctx(); if (!this.musicOn || !this.unlocked || !ac) { if (this.late && this.musicOn) this.want = [name, vol]; return; }   // iPhone before the first tap: start it then
     const token = (this.token = (this.token || 0) + 1);
     this.load(name).then((b) => {
       if (!b || token !== this.token || this.musicName !== name) return;   // stopped or replaced while it was loading
@@ -76,11 +78,13 @@ export class AudioMan {
   // phones suspend (or "interrupt") the audio context when the page loses focus; any touch wakes it again
   resume() { if (!this.away && this.unlocked && this.ac && this.ac.state !== 'running') this.ac.resume().catch(() => {}); }
   // load time: start the title music straight away. Browsers keep the sound muted until the first tap/key, so it begins the moment they allow it
-  auto(name, vol) { this.unlock(); this.playMusic(name, vol); }
-  kick() { if (this.away) return; if (!this.ac || this.ac.state !== 'running') this.unlock(); }
+  auto(name, vol) { if (this.late) { this.want = [name, vol]; return; } this.unlock(); this.playMusic(name, vol); }   // iPhones: the music is remembered and starts at the first tap
+  kick(ev) { if (this.away) return; if (this.late && ev && /down$/.test(ev.type)) return;   // iOS: only the END of a tap counts
+    if (!this.ac || this.ac.state !== 'running') this.unlock(); }
   // must run inside a touch/click: resumes the context and plays one silent sample, which is what unlocks sound on iOS
   unlock() {
-    this.unlocked = true; const ac = this.ctx(); if (!ac) return;
+    this.gesture = true; this.unlocked = true; const ac = this.ctx(); if (!ac) return;
+    if (!this.ready) { this.ready = true; if (this.pre) this.preload(this.pre); if (this.want) { const [n, v] = this.want; this.want = null; this.musicName = null; this.playMusic(n, v); } }
     try { const s = ac.createBufferSource(); s.buffer = ac.createBuffer(1, 1, 22050); s.connect(ac.destination); s.start(0); } catch (e) { /* ignore */ }
     if (ac.state !== 'running') { const p = ac.resume(); if (p && p.catch) p.catch(() => {}); }
   }
