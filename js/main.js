@@ -11,6 +11,7 @@ import { Ach } from './ach.js';
 import { W, H, CH, OY, panel, pillBtn, Hits, roundRect } from './ui.js';
 import { Screen, MenuScreen, PowerSelectScreen, ResultsScreen, Dialog, TutorialPopup, DailyRewardScreen, ExtrasPanel, ShopScreen, ConfirmPurchase, ShareDialog, easeIO, SLIDE_T, PX, PY } from './screens.js';
 import { ExtrasScreen, IconSelect, ContinuePanel } from './extras.js';
+import { FreeGoldScreen } from './freegold.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -94,6 +95,7 @@ class PauseScreen extends Screen {
 
 class App {
   get Extras() { return ExtrasScreen; }
+  get FreeGold() { return FreeGoldScreen; }
   get Confirm() { return ConfirmPurchase; }
   get ShareDialog() { return ShareDialog; }
   get Highscores() { return ExtrasPanel; }
@@ -101,7 +103,7 @@ class App {
   constructor() { this.G = G; this.stack = []; this.toasts = []; this.toastT = 0; }
   top() { return this.stack[this.stack.length - 1]; }
   // CCTransitionFade(0.5): full scenes fade to black and back; panels, dialogs and popups do not
-  isScene(s) { return s instanceof ExtrasScreen || s instanceof PowerSelectScreen || s instanceof MenuScreen || s instanceof ResultsScreen || s instanceof PlayScreen; }
+  isScene(s) { return s instanceof ExtrasScreen || s instanceof FreeGoldScreen || s instanceof PowerSelectScreen || s instanceof MenuScreen || s instanceof ResultsScreen || s instanceof PlayScreen; }
   swap(fn) { if (this.fade) return fn(); this.fade = { t: 0, fn, did: false }; }
   go(s) { if (this.isScene(s) && this.top() && !(this.top() instanceof PlayScreen && false)) this.swap(() => this.stack.push(s)); else this.stack.push(s); }
   back() { if (this.stack.length > 1) { const t = this.top(); if (this.isScene(t)) this.swap(() => this.stack.pop()); else this.stack.pop(); } }
@@ -179,12 +181,12 @@ async function boot() {
     const [lstart, lgold] = await Promise.all([Atlas.load('assets/startMenuSheet-hd'), BMFont.load('assets/goldFont-hd')]);
     G.loading = { p: 0, text: LINES[Math.floor(Math.random() * LINES.length)], start: lstart, gold: lgold, t0: performance.now() };
     loadingEl.remove(); requestAnimationFrame(frame);
-    const [obj, ui, menu, start, icons, big, gold, chat, level, numbers, scoreF, coin, ach] = await Promise.all([
+    const [obj, ui, menu, start, icons, big, gold, chat, level, numbers, scoreF, coin, ach, sheet2] = await Promise.all([
       Atlas.load('assets/ObjectSheet-hd'), Atlas.load('assets/BoomUISheet-hd'), Atlas.load('assets/menuSheet-hd'), Atlas.load('assets/startMenuSheet-hd'), Atlas.load('assets/boomIconSheet-hd'),
       BMFont.load('assets/bigFont-hd'), BMFont.load('assets/goldFont-hd'), BMFont.load('assets/chatFont-hd'), BMFont.load('assets/levelFont-hd'), BMFont.load('assets/numbersFont-hd'), BMFont.load('assets/scoreFont2-hd'),
-      loadImage('assets/boomCoin-hd.png'), Ach.load(save),
+      loadImage('assets/boomCoin-hd.png'), Ach.load(save), Atlas.load('assets/BoomSheet02-hd'),
     ]);
-    G.obj = obj; G.ui = ui; G.menu = menu; G.start = start; G.icons = icons; G.fonts = { big, gold, chat, level, numbers, score: scoreF }; G.coin = coin; G.save = save; G.ach = ach;
+    G.obj = obj; G.ui = ui; G.menu = menu; G.start = start; G.icons = icons; G.fonts = { big, gold, chat, level, numbers, score: scoreF }; G.coin = coin; G.sheet2 = sheet2; G.save = save; G.ach = ach;
     G.lib = await AnimLibrary.load('assets/', obj); G.libXL = new AnimLibrary(G.lib.defs, G.lib.descs, menu); // xl_Block frames live in menuSheet
     G.fx = await Particles.load('assets/', await Atlas.load('assets/particleImgSheet'));
     G.store = await Store.load(save, ach); ach.store = G.store;

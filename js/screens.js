@@ -90,7 +90,7 @@ export class MenuScreen extends Screen {
     // vertical menu: Play / Store / Extras / Free Gold. Positions are the original game's own values, read from the running game with Frida:
     // the menu node sits at (160, 266.667) in its 320x533.33 layer, labels at x +14.5 / +30.5 / +36.5 / +41 and y +87.333 / +25.111 / -36.111 / -92.333,
     // the boomling blocks at x -80. canvas px = (2x, 1013.333 - 2y) for original layer coordinates (x, y)
-    const items = [['mainPlayBtn_001.png', () => this.app.startFlow()], ['mainStoreBtn_001.png', () => this.app.go(new ShopScreen(this.app))], ['mainExtrasBtn_001.png', () => this.app.go(new this.app.Extras(this.app))], ['freeGoldBtn_001.png', () => this.app.netError()]];
+    const items = [['mainPlayBtn_001.png', () => this.app.startFlow()], ['mainStoreBtn_001.png', () => this.app.go(new ShopScreen(this.app))], ['mainExtrasBtn_001.png', () => this.app.go(new this.app.Extras(this.app))], ['freeGoldBtn_001.png', () => this.app.go(new this.app.FreeGold(this.app))]];
     const ys = [305.333, 429.778, 552.222, 664.667], lxs = [349, 381, 393, 402];
     items.forEach(([name, fn], i) => {
       const [wpx, hpx] = menu.size(name), cx = lxs[i], cy = ys[i];
