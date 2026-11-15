@@ -10,7 +10,7 @@ import { Particles } from './particles.js';
 import { Store } from './store.js';
 import { Ach } from './ach.js';
 import { W, H, CH, OY, panel, pillBtn, Hits, roundRect } from './ui.js';
-import { Screen, MenuScreen, PowerSelectScreen, ResultsScreen, Dialog, TutorialPopup, DailyRewardScreen, ExtrasPanel, ShopScreen, ConfirmPurchase, ShareDialog, easeIO, SLIDE_T, PX, PY } from './screens.js';
+import { Screen, MenuScreen, PowerSelectScreen, ResultsScreen, Dialog, FormDialog, TutorialPopup, DailyRewardScreen, ExtrasPanel, ShopScreen, ConfirmPurchase, ShareDialog, easeIO, SLIDE_T, PX, PY } from './screens.js';
 import { ExtrasScreen, IconSelect, ContinuePanel } from './extras.js';
 import { FreeGoldScreen } from './freegold.js';
 import { Api } from './api.js';
@@ -22,14 +22,25 @@ const ctx = canvas.getContext('2d');
 const loadingEl = document.getElementById('loading');
 
 // fit the canvas to what is really visible (phones: URL bar showing/hiding, rotation, keyboard)
+// While a text box is open the phone keyboard shrinks the viewport; the game must NOT follow that, so sizing is frozen at what it was before the
+// keyboard appeared (the game keeps its exact size and place; the keyboard simply covers the lower part of the screen).
+let kbOpen = false, lastW = 0, lastH = 0;
+const isField = (e) => !!e && (e.tagName === 'INPUT' || e.tagName === 'TEXTAREA');
+function freezeLayout(on) {
+  for (const el of [document.documentElement, document.body]) { el.style.height = on ? lastH + 'px' : ''; el.style.bottom = on ? 'auto' : ''; el.style.width = on ? lastW + 'px' : ''; }
+}
+window.addEventListener('focusin', (e) => { if (isField(e.target) && !kbOpen) { kbOpen = true; freezeLayout(true); } });
+window.addEventListener('focusout', () => setTimeout(() => { if (kbOpen && !isField(document.activeElement)) { kbOpen = false; freezeLayout(false); fit(); window.scrollTo(0, 0); } }, 250));
 function fit() {
+  if (kbOpen) return;
   const vv = window.visualViewport, w = Math.min(window.innerWidth, (vv && vv.width) || Infinity), h = Math.min(window.innerHeight, (vv && vv.height) || Infinity);
+  lastW = window.innerWidth; lastH = window.innerHeight;
   const s = Math.min(w / W, h / CH);
   canvas.style.width = Math.floor(W * s) + 'px';
   canvas.style.height = Math.floor(CH * s) + 'px';
 }
 window.addEventListener('resize', fit); window.addEventListener('orientationchange', () => setTimeout(fit, 150)); fit();
-if (window.visualViewport) window.visualViewport.addEventListener('resize', fit);
+if (window.visualViewport) { window.visualViewport.addEventListener('resize', fit); window.visualViewport.addEventListener('scroll', () => { if (kbOpen) window.scrollTo(0, 0); }); }
 
 const G = { ctx, audio: new AudioMan('assets/'), onDeath: null };
 const SKIP_ITEM = { 5: 'kItemSkip', 10: 'kItemSkipB', 15: 'kItemSkipC' };
@@ -139,15 +150,10 @@ class App {
     if (G.store.claimOffline('daily', 86400000)) { G.save.addGold(50); return; }
     this.dialog('Unavailable', 'Check back tomorrow for a new Daily Reward!', [['OK', null]]);
   }
-  rename() {
-    const inp = document.createElement('input');
-    inp.maxLength = 12; inp.value = G.save.d.name; inp.placeholder = 'Your name';
-    const r = canvas.getBoundingClientRect();
-    inp.style.cssText = 'position:fixed;z-index:9;font:700 20px Helvetica,Arial,sans-serif;text-align:center;border:3px solid #fff;border-radius:10px;background:#0a3a8a;color:#fff;padding:8px;width:' + Math.min(260, r.width * 0.7) + 'px;left:' + (r.left + r.width / 2 - Math.min(260, r.width * 0.7) / 2 - 11) + 'px;top:' + (r.top + r.height * (matchMedia('(pointer: coarse)').matches ? 0.2 : 0.45)) + 'px';   /* higher on phones, above the keyboard */
-    let fin = false; const done = (ok) => { if (fin) return; fin = true; if (ok && inp.value.trim()) { G.save.d.name = inp.value.trim().slice(0, 12); G.save.flush(); } inp.remove(); };
-    inp.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') done(true); else if (e.key === 'Escape') done(false); });
-    inp.addEventListener('blur', () => done(true));
-    document.body.appendChild(inp); inp.focus(); inp.select();
+  // the game's own text box (FormDialog); the name is saved with OK
+  async rename() {
+    const r = await new Promise((res) => this.go(new FormDialog(this, 'Your name', [{ key: 'name', label: 'Name (12 characters max)', max: 12, value: G.save.d.name }], [['OK', 'ok'], ['Cancel', null]], res)));
+    if (r.button && r.values.name.trim()) { G.save.d.name = r.values.name.trim().slice(0, 12); G.save.flush(); }
   }
   beginGame(startLevel = 1, resume = false) {
     const key = resume ? null : SKIP_ITEM[startLevel];
@@ -305,5 +311,26 @@ window.addEventListener('keydown', (ev) => {
   if (top instanceof TutorialPopup) { top.close(); return; }
   if (ev.key === 'Escape' || ev.key === 'p') { if (top instanceof PlayScreen) app.pause(); else if (top instanceof PauseScreen) app.resume(); else if (top && !(top instanceof MenuScreen) && !(top instanceof ResultsScreen)) app.back(); }
 });
+
+// New-update notice: every deploy stamps version.json (scripts/version.mjs). The game remembers the id it started with, re-checks quietly every minute and
+// whenever the app comes back to the front, and when the id has changed it tells the player to refresh (never in the middle of a run).
+let buildId = null, newBuild = null, shownBuild = null;
+async function checkBuild() {
+  try {
+    const j = await (await fetch('version.json?' + Date.now(), { cache: 'no-store' })).json();
+    if (typeof j.v !== 'string') return;
+    if (buildId === null) buildId = j.v; else if (j.v !== buildId) newBuild = j.v;
+  } catch (e) { /* offline: try again later */ }
+  offerRefresh();
+}
+function offerRefresh() {
+  if (!newBuild || shownBuild === newBuild) return;
+  const top = app.top();
+  if (!top || top instanceof PlayScreen || top instanceof Dialog || app.fade || G.loading && !G.fonts) { setTimeout(offerRefresh, 4000); return; }   // wait for a calm moment
+  shownBuild = newBuild;
+  app.dialog('New Update!', 'A new update is ready!\n<cg>Refresh the page</c> to get it.', [['LATER', () => setTimeout(() => { shownBuild = null; offerRefresh(); }, 600000)], ['REFRESH', () => location.reload()]]);   // "later" asks again in 10 minutes
+}
+checkBuild(); setInterval(checkBuild, 60000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkBuild(); });
 
 boot();

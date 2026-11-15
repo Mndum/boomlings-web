@@ -2,3 +2,4 @@ server/dev.sqlite*
 node_modules
 .wrangler
 .dev.vars
+version.json

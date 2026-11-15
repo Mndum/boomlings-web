@@ -4,6 +4,10 @@ compatibility_date = "2025-01-01"
 
 # the game itself: every static file in this repo (see .assetsignore for what is left out);
 # only /api/* runs the Worker, so everything is same-origin and needs no CORS
+# stamps version.json on every deploy, so open games can tell players a new update is out
+[build]
+command = "node scripts/version.mjs"
+
 [assets]
 directory = "."
 binding = "ASSETS"

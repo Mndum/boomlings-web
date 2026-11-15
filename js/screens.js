@@ -585,6 +585,66 @@ export class Dialog extends Screen {
   }
 }
 
+// A text-entry dialog in the game's own look: the FLAlertLayer frame, the game fonts and the game's buttons, all drawn on the canvas.
+// The typing itself goes into invisible <input>s that sit exactly over the fields, so tapping a field opens the phone keyboard without
+// anything on the page changing size, and nothing is ever drawn outside the game screen. Resolves { button, values } (button null = cancelled).
+export class FormDialog extends Dialog {
+  constructor(app, title, fields, buttons, resolve) {
+    super(app, title, '', [], false);
+    this.fields = fields.map((f) => ({ ...f, value: String(f.value || '') })); this.btns = buttons; this.resolve = resolve; this.cur = 0; this.done = false;
+    this.inputs = this.fields.map((f, i) => {
+      const inp = document.createElement('input');
+      inp.style.cssText = 'position:fixed;z-index:9;opacity:0;border:0;padding:0;margin:0;background:transparent;color:transparent;caret-color:transparent;font:16px sans-serif;outline:0;pointer-events:none;left:0;top:0;width:10px;height:10px';   // 16px: iOS does not zoom in
+      inp.type = f.type === 'password' ? 'password' : 'text'; inp.maxLength = f.max || 40; inp.value = f.value; inp.spellcheck = false;
+      inp.autocomplete = f.type === 'password' ? 'current-password' : 'off';
+      inp.setAttribute('autocapitalize', 'off'); inp.setAttribute('autocorrect', 'off'); inp.enterKeyHint = i < this.fields.length - 1 ? 'next' : 'done';
+      inp.addEventListener('input', () => { f.value = inp.value; });
+      inp.addEventListener('focus', () => { this.cur = i; });
+      inp.addEventListener('keydown', (e) => {
+        e.stopPropagation();
+        if (e.key === 'Enter') { e.preventDefault(); if (i < this.fields.length - 1) this.focusField(i + 1); else this.finish(this.btns[0][1]); }
+        else if (e.key === 'Escape') this.finish(null);
+      });
+      document.body.appendChild(inp); return inp;
+    });
+    this.watch = setInterval(() => { if (!this.done && !this.app.stack.includes(this)) this.cleanup(null); }, 400);   // popped some other way (back button): tidy up
+    this.focusField(0);
+  }
+  focusField(i) { this.cur = i; const inp = this.inputs[i]; try { inp.focus({ preventScroll: true }); inp.setSelectionRange(inp.value.length, inp.value.length); } catch (e) { /* ignore */ } }
+  values() { const v = {}; this.fields.forEach((f) => { v[f.key] = f.value; }); return v; }
+  cleanup(key) { if (this.done) return; this.done = true; clearInterval(this.watch); const v = this.values(); this.inputs.forEach((i) => i.remove()); this.resolve({ button: key, values: v }); }
+  finish(key) { if (this.done) return; this.cleanup(key); if (this.app.top() === this) this.app.back(); }
+  // keep each invisible input exactly over its drawn field
+  place(i, x, y, w, h) { const r = document.getElementById('game').getBoundingClientRect(), sx = r.width / W, sy = r.height / CH, s = this.inputs[i].style; s.left = r.left + x * sx + 'px'; s.top = r.top + (y + OY) * sy + 'px'; s.width = w * sx + 'px'; s.height = h * sy + 'px'; }
+  drawBox(ctx, k) {
+    const n = this.fields.length, w = 540, h = 132 + n * 134 + 112, x = 320 - w / 2, y = 108, cx = 320, cy = y + h / 2;   // high on the screen, so a phone keyboard never covers it
+    ctx.save(); ctx.translate(cx, cy); ctx.scale(k, k); ctx.translate(-cx, -cy);
+    nineSlice(ctx, this.G.img.sq01, x, y, w, h, 56);
+    this.f.gold.draw(ctx, this.titleText, 320, y + 66, { scale: Math.min(0.9, 440 / this.f.gold.measure(this.titleText, 1)) });
+    this.fields.forEach((f, i) => {
+      const fy = y + 120 + i * 134, fx = x + 40, fw = w - 80, fh = 74, ty = fy + 18, on = this.cur === i, sc = 0.8;
+      this.f.chat.draw(ctx, f.label, fx + 6, fy + 2, { align: 'left', scale: Math.min(0.62, (fw - 12) / this.f.chat.measure(f.label, 1)) });
+      ctx.fillStyle = '#001a33'; roundRect(ctx, fx, ty, fw, fh, 14); ctx.fill();
+      ctx.lineWidth = 4; ctx.strokeStyle = on ? '#ffd23f' : '#3d6fae'; roundRect(ctx, fx, ty, fw, fh, 14); ctx.stroke();
+      let s = f.type === 'password' ? '*'.repeat(f.value.length) : f.value;
+      while (s.length > 1 && this.f.chat.measure(s, sc) > fw - 44) s = s.slice(1);   // long text shows its end, where you are typing
+      if (s) this.f.chat.draw(ctx, s, fx + 20, ty + fh / 2 + 8, { align: 'left', scale: sc });
+      if (on && Math.floor(this.t * 2) % 2 === 0) { ctx.fillStyle = '#ffd23f'; ctx.fillRect(fx + 22 + (s ? this.f.chat.measure(s, sc) : 0), ty + 14, 4, fh - 28); }
+      if (k > 0.9) this.hits.add(fx, ty, fw, fh, () => this.focusField(i));
+      this.place(i, fx, ty, fw, fh);
+    });
+    const sc = 0.8, ws = this.btns.map(([l]) => Math.max(109, this.f.gold.measure(l, sc) + 33)), gap = 24, tot = ws.reduce((a, b) => a + b, 0) + gap * (ws.length - 1);
+    let bx = Math.max(x + 14, 320 - tot / 2); const by = y + h - 62;
+    this.btns.forEach(([label, key], i) => {
+      const bw = Math.min(ws[i], (w - 28 - gap * (ws.length - 1)) / ws.length), x0 = bx;
+      this.pressed(ctx, x0, by - 30, bw, 61, x0 + bw / 2, by, () => { btnBG(ctx, this.G.img.btn, x0, by - 30, bw, 61); this.f.gold.draw(ctx, label, x0 + bw / 2, by + 6, { scale: Math.min(1, (bw - 30) / this.f.gold.measure(label, 1)) }); });
+      if (k > 0.9) this.hits.add(x0, by - 30, bw, 61, () => this.finish(key));
+      bx += bw + gap;
+    });
+    ctx.restore();
+  }
+}
+
 // ConfirmPurchaseLayer (FLAlertLayer subclass): banner title, item icon + price, dark description box, Cancel / Buy buttons
 export class ConfirmPurchase extends Dialog {
   constructor(app, item, buyLabel, afford, onBuy) { super(app, item.title, '', [], false); this.item = item; this.buyLabel = buyLabel; this.afford = afford; this.onBuy = onBuy; }
