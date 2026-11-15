@@ -11,7 +11,7 @@ import { Store } from './store.js';
 import { Ach } from './ach.js';
 import { W, H, CH, OY, panel, pillBtn, Hits, roundRect } from './ui.js';
 import { Screen, MenuScreen, PowerSelectScreen, ResultsScreen, Dialog, FormDialog, TutorialPopup, DailyRewardScreen, ExtrasPanel, ShopScreen, ConfirmPurchase, ShareDialog, easeIO, SLIDE_T, PX, PY } from './screens.js';
-import { ExtrasScreen, IconSelect, ContinuePanel } from './extras.js';
+import { ExtrasScreen, IconSelect, ContinuePanel, ChangelogPanel } from './extras.js';
 import { FreeGoldScreen } from './freegold.js';
 import { Api } from './api.js';
 import { Pranks } from './pranks.js';
@@ -323,9 +323,22 @@ async function checkBuild() {
   try {
     const j = await (await fetch('version.json?' + Date.now(), { cache: 'no-store' })).json();
     if (typeof j.v !== 'string') return;
-    if (buildId === null) buildId = j.v; else if (j.v !== buildId) newBuild = j.v;
+    if (buildId === null) { buildId = j.v; noteBuild(); } else if (j.v !== buildId) newBuild = j.v;
   } catch (e) { /* offline: try again later */ }
   offerRefresh();
+}
+// first start on a new build (after the player refreshed, or came back after an update): open the Changelog once from the main menu.
+// A brand-new player (never finished the tutorial) is not shown it.
+function noteBuild() {
+  if (!G.save) { setTimeout(noteBuild, 500); return; }   // the game is still loading
+  let seen = null; try { seen = localStorage.getItem('boomlings.seenBuild'); } catch (e) { /* storage blocked */ }
+  try { localStorage.setItem('boomlings.seenBuild', buildId); } catch (e) { /* ignore */ }
+  if (seen !== buildId && G.save && G.save.seen('tutDone')) showChangelog();
+}
+function showChangelog() {
+  const top = app.top();
+  if (!top || !(top instanceof MenuScreen) || app.fade || G.loading || !G.fonts) { setTimeout(showChangelog, 1500); return; }   // wait for the main menu, no dialog in front
+  app.go(new ChangelogPanel(app));
 }
 function offerRefresh() {
   if (!newBuild || shownBuild === newBuild) return;

@@ -111,7 +111,7 @@ export class AchPanel extends ListPanel {
 
 // what changed in each update, newest first (Options > Changelog): brown list, gold version titles, chat-font lines
 const CHANGELOG = [
-  ['Update 8: Music and Changelog', ['Music now starts the moment the game loads', 'This changelog (Options > Changelog)', 'Options buttons re-spaced']],
+  ['Update 8: Music and Changelog', ['Music now starts the moment the game loads', 'Sound mutes when you leave or switch apps on a phone', 'Full-quality danger music', 'This changelog opens by itself after each update (also Options > Changelog)']],
   ['Update 7: Real particles', ['Menu sparkles and all effects now follow the real game engine', 'New update pop-up: refresh to get the latest version', 'In-game text box that never resizes the screen']],
   ['Update 6: Phones', ['Works on iPhone and Android', 'Haptics on Android (Options)', 'Game centred with black borders on phones', 'Music no longer shows in the media player']],
   ['Update 5: Friends', ['Connect your Discord account', 'Friends tab shows players from your servers', 'Trophy tab shows the top 50 players', 'Share dialog buttons animate']],
