@@ -7,13 +7,18 @@
 <style>
   html, body { margin: 0; height: 100%; background: #0b1020; overflow: hidden; touch-action: none; }
   body { display: flex; align-items: center; justify-content: center; font-family: sans-serif; }
-  #game { display: block; image-rendering: auto; background: #0b1020; touch-action: none; }
+  #game { display: block; image-rendering: auto; background: #0b1020; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-user-drag: none; }
   #loading { position: absolute; color: #ffd84a; font: 18px/1.4 sans-serif; text-align: center; }
 </style>
 </head>
 <body>
 <div id="loading">Loading Boomlings…</div>
 <canvas id="game" width="640" height="1066"></canvas>
+<script>
+  // no right-click menu (so "Save image as…" is not offered on the game) and no dragging the canvas out
+  addEventListener('contextmenu', function (e) { e.preventDefault(); });
+  addEventListener('dragstart', function (e) { e.preventDefault(); });
+</script>
 <script type="module" src="js/main.js"></script>
 </body>
 </html>
