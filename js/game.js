@@ -640,12 +640,11 @@ export class PlayScene {
     if (this.over) return;
     this.boomMult = 1; this.flatMult = false;
     if (this.tut) {
-      // real timeline after the last move settles: pieces/arrow/ring fade (FadeTo 0.2 / FadeOut 0.4), +1.0s the text scales to 0.01 (ScaleTo 0.3, EaseIn 2), +0.45s later the next step starts
+      // real timeline after the last move settles: pieces/arrow/ring fade (FadeTo 0.2 / FadeOut 0.4), the next step starts ~1.45s later
       const t = this.tut, nx = TUT_STEPS[t.i + 1];
       t.endAt = performance.now() / 1000;
       if (nx && !nx.keep) for (const p of this.pieces) this.tween(p, { alpha: 0 }, 0.2);
-      await this.wait(1000); t.textOutAt = performance.now() / 1000;
-      await this.wait(450); await this.tutNext(); return;
+      await this.wait(1450); await this.tutNext(); return;
     }
     if (this.levelPoints >= this.target) { await this.levelComplete(); this.busy = false; return; }
     await this.newTurn();
@@ -873,7 +872,6 @@ export class PlayScene {
       obj.draw(ctx, (c.x + c.y) % 2 ? 'TileDark01_001.png' : 'TileLight01_001.png', x, y);
       if (this.reachable.has(c)) { ctx.fillStyle = 'rgba(255,255,255,0.28)'; ctx.fillRect(x - CELL / 2 + 1, y - CELL / 2 + 1, CELL - 2, CELL - 2); }
     }
-    if (this.selected) { const [x, y] = this.cellCenter(this.selected); ui.draw(ctx, 'selectOverlay_001.png', x, y, { alpha: 0.9 }); }
     if (this.path) for (const c of this.path) { const [x, y] = this.cellCenter(c); ui.draw(ctx, 'whiteDot_001.png', x, y, { alpha: 0.6, scale: 0.7 }); }
     if (this.G.fx) this.G.fx.draw(ctx, 'trail');
     const sorted = this.pieces.slice().sort((a, b) => a.py - b.py || a.id - b.id);
@@ -887,10 +885,12 @@ export class PlayScene {
         if (obj.has(n)) obj.draw(ctx, n, p.px + sx + 24, p.py - 26, { scale: p.scale, alpha: p.alpha });
       }
     }
+    // the selection brackets (selectOverlay) are drawn over the selected blob in the real game
+    if (this.selected) { const [x, y] = this.cellCenter(this.selected); ui.draw(ctx, 'selectOverlay_001.png', x, y, { alpha: 0.9 }); }
     for (const e of this.effects) this.drawEffect(ctx, e);
-    this.drawTut(ctx);
     this.drawShop(ctx);
     this.drawHUD(ctx);
+    this.drawTut(ctx);   // GameTutorialManager's arrow / ring / text sit above the UILayer (the real arrow overlaps the HUD bar)
     if (this.levelText) {
       const t = this.levelText.t, a = t < 0.5 ? 0 : t < 1.0 ? (t - 0.5) / 0.5 : t < 1.5 ? 1 : Math.max(0, 1 - (t - 1.5) / 0.5), lf = fonts.level;
       if (a > 0 && lf) lf.draw(ctx, this.levelText.text, 320, 384, { scale: 330 / lf.measure('LEVEL 1', 1), alpha: a });
@@ -925,9 +925,7 @@ export class PlayScene {
       const [mx, my] = this.cellCenter(mv); ui.draw(ctx, 'green_arrow_001.png', mx, my - 127 - 9.3 * (1 - Math.cos(2 * Math.PI * (now - 0.55) / 2.05)) / 2, { alpha: Math.min(1, now / 0.5) });   // CCFadeIn(0.5)
     }
     const sc = 413 / f.measure('Tap and slide', 1);
-    const tNow = performance.now() / 1000, tin = Math.min(1, (tNow - (t.t0 || 0)) / 0.5);      // text: FadeIn(0.5)
-    const tout = t.textOutAt ? Math.min(1, (tNow - t.textOutAt) / 0.3) : 0, tsc = 1 - 0.99 * tout * tout;   // ScaleTo(0.3, 0.01) + EaseIn(2)
-    if (tout >= 1) return;
+    const tNow = performance.now() / 1000, tin = Math.max(0, Math.min(1, ((tNow - (t.t0 || 0)) - 0.3) / 0.3)), tsc = 1;   // text: DelayTime(0.3) + FadeIn(0.3)
     (st.text || []).forEach((line, li) => {
       const [sx, sy] = st.textPos[li], cx = sx * 4 / 3, cy = (sy + 3.5 - 40) * 4 / 3, ls = line.length === 1 && line[0][0] === 'OR' ? 0.87 : 1;
       const widths = line.map(([s2]) => f.measure(s2, sc * ls)), tot = widths.reduce((a, b) => a + b, 0); let x = cx - tot / 2;
@@ -943,7 +941,7 @@ export class PlayScene {
       if (e.t < 0) return;
       const v = e.pts / (e.mod || 1), tier = v >= 500 ? 1.3 : v >= 400 ? 1.2 : v >= 300 ? 1.1 : v >= 200 ? 1.0 : v >= 100 ? 0.9 : 0.8;
       const col = { 1: '#69ff69', 2: '#ff6464', 3: '#ffa63c', 4: '#64a5ff', 5: '#ff78ff', 6: '#fff03c' }[e.color] || '#ffffff';
-      const t = e.t, sh = t < 0.8 ? 1 : 1 - Math.pow((t - 0.8) / 0.4, 2); // ScaleTo 0 (ease in) after a rest
+      const t = e.t, sh = t < 0.9 ? 1 : 1 - Math.pow((t - 0.9) / 0.3, 2); // DelayTime(0.9) then ScaleTo(0.3, 0.01) + EaseIn(2), as traced
       if (sh <= 0.01) return;
       (fonts.score || fonts.big).multiplied(col).draw(ctx, String(e.pts), e.x, e.y - 8 - 29 * (t / 1.2), { scale: tier * 1.04 * sh });
       return;
