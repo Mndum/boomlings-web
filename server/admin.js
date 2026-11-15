@@ -21,6 +21,13 @@ async function login(req, env) {
   return J({ token, expiresIn: SESSION_SECONDS });
 }
 const logAct = (env, action, u, detail) => env.DB.prepare('INSERT INTO admin_log (at, action, target_id, target_name, detail) VALUES (?, ?, ?, ?, ?)').bind(now(), action, u ? u.id : null, u ? u.name : null, detail || null).run();
+// keep the cloud copy in step when an admin changes someone's coins
+async function editSaveGold(env, id, fn) {
+  const s = await env.DB.prepare('SELECT data FROM saves WHERE user_id = ?').bind(id).first();
+  if (!s) return;
+  try { const d = JSON.parse(s.data); d.gold = Math.max(0, fn(Number(d.gold) || 0)); await env.DB.prepare('UPDATE saves SET data = ? WHERE user_id = ?').bind(JSON.stringify(d), id).run(); } catch (e) { /* unreadable save: leave it */ }
+}
+const PRANKS = new Set(['message', 'toast', 'sound', 'fakegold', 'flip', 'mirror', 'tiny', 'wobble', 'rainbow', 'invert', 'gray', 'sepia', 'blur', 'zoomies']);
 const cleanQ = (s) => String(s || '').toLowerCase().replace(/[%_\\]/g, ' ').trim().slice(0, 30);
 
 const admin = {
@@ -50,7 +57,7 @@ const admin = {
 
   async 'GET user'(req, env, url) {
     const id = +url.searchParams.get('id');
-    const u = await env.DB.prepare('SELECT id, name, created_at, banned, ban_reason, ref_code, referred_by, earned_gold, claimed_gold FROM users WHERE id = ?').bind(id).first();
+    const u = await env.DB.prepare('SELECT id, name, created_at, banned, ban_reason, ref_code, referred_by, earned_gold, claimed_gold, take_gold, wipe_gold, last_iap FROM users WHERE id = ?').bind(id).first();
     if (!u) return bad('No such player', 404);
     const [sc, sv, ses, by, refs] = await Promise.all([
       env.DB.prepare('SELECT best_score, best_level, rank, icon, updated_at FROM scores WHERE user_id = ?').bind(id).first(),
@@ -73,6 +80,27 @@ const admin = {
     return J({ log: (await env.DB.prepare('SELECT at, action, target_id, target_name, detail FROM admin_log ORDER BY id DESC LIMIT 200').all()).results });
   },
 
+  // who is playing right now (heartbeat within the last 20s), with their screen, score and snapshot
+  async 'GET live'(req, env, url) {
+    const only = +url.searchParams.get('id') || 0;
+    const rows = await env.DB.prepare(`SELECT l.user_id AS id, u.name, l.seen, l.state, l.thumb FROM live l JOIN users u ON u.id = l.user_id WHERE l.seen > ? ${only ? 'AND l.user_id = ?' : ''} ORDER BY l.seen DESC LIMIT 50`).bind(...(only ? [now() - 20, only] : [now() - 20])).all();
+    return J({ now: now(), players: rows.results.map((r) => ({ id: r.id, name: r.name, seen: r.seen, state: r.state ? JSON.parse(r.state) : {}, thumb: r.thumb })) });
+  },
+
+  // queue a prank for one player or everybody who is online: {id | 'all', type, secs, text, text2}
+  async 'POST prank'(req, env) {
+    const b = await body(req, 2000), t = now();
+    if (!PRANKS.has(b.type)) return bad('Unknown prank');
+    const data = JSON.stringify({ type: b.type, secs: Math.max(2, Math.min(30, Math.floor(+b.secs) || 10)), text: String(b.text || '').slice(0, 40), text2: String(b.text2 || '').slice(0, 140) });
+    let targets;
+    if (b.id === 'all') targets = (await env.DB.prepare('SELECT user_id FROM live WHERE seen > ?').bind(t - 20).all()).results.map((r) => r.user_id);
+    else { const u = await env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(+b.id).first(); if (!u) return bad('No such player', 404); targets = [u.id]; }
+    if (!targets.length) return bad('Nobody is online right now', 409);
+    await env.DB.batch(targets.map((id) => env.DB.prepare('INSERT INTO pranks (user_id, at, data) VALUES (?, ?, ?)').bind(id, t, data)));
+    await logAct(env, 'prank', targets.length === 1 ? await env.DB.prepare('SELECT id, name FROM users WHERE id = ?').bind(targets[0]).first() : null, b.type + (targets.length > 1 ? ' on ' + targets.length + ' players' : ''));
+    return J({ ok: true, sent: targets.length });
+  },
+
   // one endpoint for every change: {action, id, ...}
   async 'POST action'(req, env) {
     const b = await body(req, 2000), id = +b.id;
@@ -92,6 +120,18 @@ const admin = {
         await env.DB.prepare('UPDATE users SET earned_gold = earned_gold + ? WHERE id = ?').bind(g, id).run();
         await logAct(env, 'gift gold', u, g + ' gold (arrives next time they open the game)'); break;
       }
+      case 'takeGold': {
+        const g = Math.floor(+b.gold);
+        if (!(g >= 1 && g <= 1000000000)) return bad('Enter how many coins to take');
+        await env.DB.prepare('UPDATE users SET take_gold = take_gold + ? WHERE id = ?').bind(g, id).run();
+        await editSaveGold(env, id, (c) => c - g);
+        await logAct(env, 'take coins', u, g + ' coins (removed from their game next time they open it)'); break;
+      }
+      case 'wipeGold':
+        await env.DB.prepare('UPDATE users SET wipe_gold = 1, take_gold = 0 WHERE id = ?').bind(id).run();
+        await editSaveGold(env, id, () => 0);
+        await logAct(env, 'set coins to 0', u, 'applied next time they open the game'); break;
+      case 'resetIap': await env.DB.prepare('UPDATE users SET last_iap = 0 WHERE id = ?').bind(id).run(); await logAct(env, 'reset free-gold timer', u); break;
       case 'rename': {
         const nm = String(b.name || '').trim();
         if (!NAME_RE.test(nm)) return bad('Name must be 3-12 letters, numbers, space, _ or -');
@@ -110,7 +150,7 @@ const admin = {
       case 'clearSave': await env.DB.prepare('DELETE FROM saves WHERE user_id = ?').bind(id).run(); await logAct(env, 'delete cloud save', u); break;
       case 'delete':
         await env.DB.batch([
-          env.DB.prepare('UPDATE users SET referred_by = NULL WHERE referred_by = ?').bind(id), env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(id),
+          env.DB.prepare('UPDATE users SET referred_by = NULL WHERE referred_by = ?').bind(id), env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(id), env.DB.prepare('DELETE FROM live WHERE user_id = ?').bind(id), env.DB.prepare('DELETE FROM pranks WHERE user_id = ?').bind(id),
           env.DB.prepare('DELETE FROM saves WHERE user_id = ?').bind(id), env.DB.prepare('DELETE FROM scores WHERE user_id = ?').bind(id), env.DB.prepare('DELETE FROM users WHERE id = ?').bind(id)]);
         await logAct(env, 'delete account', u); break;
       default: return bad('Unknown action');

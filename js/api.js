@@ -18,7 +18,7 @@ export class Api {
   }
   // is there a backend at all? who am I?
   async init() {
-    try { this.packs = (await this.req('GET', 'api/iap')).packs; this.online = true; } catch (e) { this.online = false; return; }
+    try { const j = await this.req('GET', 'api/iap'); this.packs = j.packs; this.cooldown = j.cooldown || 259200; this.online = true; } catch (e) { this.online = false; return; }
     if (this.token) { try { this.user = (await this.req('GET', 'api/me')).user; this.claim().catch(() => {}); } catch (e) { if (e.status === 401) this.setToken(''); } }   // claim: gold gifted while away
   }
   setToken(t) { this.token = t; try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch (e) { /* ignore */ } if (!t) this.user = null; }
@@ -29,9 +29,19 @@ export class Api {
 
   // ---- gold the server hands out (referrals, free packs) goes straight into the local save
   take(gold) { if (gold > 0) { this.G.save.addGold(gold); this.G.audio.play('buyGold001.ogg', 0.8); } return gold; }
-  async claim() { return this.take((await this.req('POST', 'api/claim')).gold); }
-  async redeem(code) { const j = await this.req('POST', 'api/redeem', { code }); this.take(j.gold); return j; }
-  async buyPack(pack) { const j = await this.req('POST', 'api/iap', { pack }); this.take(j.gold); return j.gold; }
+  // what the server hands back: coins an admin took away (wipe = set to 0, take = remove some) are applied first, then gifts are added
+  applyClaim(j) {
+    const sv = this.G.save; let changed = false;
+    if (j.wipe) { sv.d.gold = 0; changed = true; }
+    if (j.take) { sv.d.gold = Math.max(0, sv.d.gold - j.take); changed = true; }
+    if (changed) sv.flush();
+    return this.take(j.gold || 0);
+  }
+  async claim() { return this.applyClaim(await this.req('POST', 'api/claim')); }
+  async redeem(code) { const j = await this.req('POST', 'api/redeem', { code }); this.applyClaim(j); return j; }
+  async buyPack(pack) { const j = await this.req('POST', 'api/iap', { pack }); if (this.user) this.user.lastIap = j.lastIap; this.applyClaim(j); return j.gold; }
+  // seconds until the next free pack is allowed (0 = now)
+  iapWait() { const u = this.user; return u && u.lastIap ? Math.max(0, Math.ceil(u.lastIap + (this.cooldown || 259200) - Date.now() / 1000)) : 0; }
 
   // ---- cloud save: the whole local save, last write wins; a stale writer gets a conflict to resolve
   isFresh() { const d = this.G.save.d; return !d.stats.games && !d.xp && d.rank <= 1 && d.gold === 0; }

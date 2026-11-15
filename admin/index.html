@@ -103,6 +103,25 @@
   .banned-note { background:color-mix(in srgb,var(--bad) 12%,transparent); border:1px solid var(--bad); border-radius:12px; padding:10px 12px; margin-bottom:16px; }
   a.link { color:var(--brand); cursor:pointer; text-decoration:underline; }
 
+
+  /* live view + pranks */
+  .live { display:grid; grid-template-columns:minmax(220px,300px) 1fr; gap:16px; align-items:start; }
+  @media (max-width:760px) { .live { grid-template-columns:1fr; } }
+  .pl { display:flex; gap:12px; align-items:center; width:100%; text-align:left; background:none; border:0; border-bottom:1px solid var(--line); padding:10px 14px; }
+  .pl:hover, .pl.on { background:var(--chip); }
+  .pl img { width:44px; height:64px; object-fit:cover; border-radius:6px; background:#071a42; flex:none; }
+  .dot { display:inline-block; width:9px; height:9px; border-radius:50%; background:var(--good); margin-right:6px; }
+  .screen { display:flex; gap:16px; padding:16px; flex-wrap:wrap; }
+  .screen img { width:192px; height:285px; border-radius:12px; background:#071a42; border:1px solid var(--line); }
+  .kv { display:grid; grid-template-columns:1fr 1fr; gap:8px; flex:1; min-width:180px; align-content:start; }
+  .kv div { background:var(--bg); border-radius:10px; padding:8px 10px; }
+  .kv small { display:block; color:var(--mute); font-size:12px; }
+  .pranks { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:8px; padding:0 16px 16px; }
+  .pranks .btn { display:flex; flex-direction:column; align-items:center; gap:2px; padding:12px 6px; }
+  .pranks .btn span { font-size:26px; line-height:1; }
+  .pranks .btn small { color:var(--mute); font-weight:500; text-align:center; }
+  .tgt { display:flex; gap:8px; padding:0 16px 12px; flex-wrap:wrap; align-items:center; }
+
   /* confirm + toast */
   #dlgWrap { position:fixed; inset:0; background:rgba(8,14,26,.6); z-index:40; display:grid; place-items:center; padding:16px; }
   #dlg { background:var(--card); border-radius:16px; padding:22px; width:min(420px,100%); box-shadow:var(--shadow); }
@@ -129,6 +148,7 @@
     <div class="brand">Boomlings<small>Server admin</small></div>
     <a href="#/overview" data-t="overview"><span class="ic">🏠</span>Overview</a>
     <a href="#/players" data-t="players"><span class="ic">👥</span>Players</a>
+    <a href="#/live" data-t="live"><span class="ic">🎭</span>Live &amp; Pranks</a>
     <a href="#/leaderboard" data-t="leaderboard"><span class="ic">🏆</span>Leaderboard</a>
     <a href="#/log" data-t="log"><span class="ic">📋</span>Activity</a>
     <div class="grow"></div>
@@ -196,7 +216,8 @@ function route() {
   if (!KEY) return;
   const [, tab = 'overview', id] = location.hash.split('/');
   document.querySelectorAll('nav a').forEach((a) => a.classList.toggle('on', a.dataset.t === tab));
-  ({ overview, players, leaderboard, log: logView }[tab] || overview)();
+  clearInterval(liveTimer);
+  ({ overview, players, live, leaderboard, log: logView }[tab] || overview)();
   if (tab === 'players' && id) openPlayer(+id); else closeSheet(true);
 }
 window.addEventListener('hashchange', route);
@@ -268,12 +289,17 @@ async function openPlayer(id) {
         <div style="grid-column:1/-1"><small>Referred by</small>${d.referredBy ? `<a class="link" onclick="go('#/players/${d.referredBy.id}')">${esc(d.referredBy.name)}</a>` : 'nobody'} · recruited ${d.referrals.length ? d.referrals.map((r) => `<a class="link" onclick="go('#/players/${r.id}')">${esc(r.name)}</a>`).join(', ') : 'nobody'}</div>
         ${sv ? `<div style="grid-column:1/-1"><small>Cloud save</small>last synced ${ago(sv.updatedAt)}</div>` : ''}
       </div>
+      <div class="sec"><h4>Take coins away</h4><div class="act"><input class="f" id="takeAmt" type="number" min="1" placeholder="Coins to remove"><button class="btn danger" id="takeBtn">Take coins</button><button class="btn danger" id="wipeBtn">Set to 0</button></div><div class="mute">${u.take_gold || u.wipe_gold ? `<b style="color:var(--warn)">Waiting for their next login:</b> ${u.wipe_gold ? 'set coins to 0' : 'remove ' + fmt(u.take_gold) + ' coins'}.` : 'Removed from their game the next time they open it (their cloud save changes right away).'}</div></div>
       <div class="sec"><h4>Give</h4><div class="act"><input class="f" id="gold" type="number" min="1" max="1000000" placeholder="Gold amount"><button class="btn primary" id="giveBtn">Gift gold</button></div><div class="mute">Gold shows up the next time they open the game.</div></div>
+      <div class="sec"><h4>Free gold packs</h4><div class="act"><button class="btn" id="iapBtn">Reset 3-day timer</button></div><div class="mute">${u.last_iap ? 'Last free pack: ' + when(u.last_iap) : 'Has not taken a free pack yet.'}</div></div>
       <div class="sec"><h4>Account</h4><div class="act"><button class="btn" id="renameBtn">Rename</button><button class="btn" id="pwBtn">Reset password</button><button class="btn" id="kickBtn">Sign out devices</button></div></div>
       <div class="sec"><h4>Moderation</h4><div class="act">${u.banned ? '<button class="btn primary" id="unbanBtn">Unban player</button>' : '<button class="btn danger" id="banBtn">Ban player</button>'}<button class="btn" id="scoreBtn">Remove from leaderboard</button><button class="btn" id="saveBtn">Delete cloud save</button></div></div>
       <div class="sec"><h4>Danger zone</h4><button class="btn danger" id="delBtn">Delete account…</button></div>`;
     $('#x').onclick = () => closeSheet();
     $('#giveBtn').onclick = () => { const g = +$('#gold').value; if (g >= 1) act('grant', { gold: g }).then(() => toast('Gold gifted')); else toast('Enter an amount first'); };
+    $('#takeBtn').onclick = async () => { const n = +$('#takeAmt').value; if (!(n >= 1)) return toast('Enter an amount first'); if (await dialog({ title: 'Take ' + fmt(n) + ' coins from ' + u.name + '?', text: 'They lose these coins from their game and cloud save.', ok: 'Take coins', danger: true })) act('takeGold', { gold: n }).then(() => toast('Coins removed')); };
+    $('#wipeBtn').onclick = async () => { if (await dialog({ title: 'Set ' + u.name + "'s coins to 0?", text: 'Their coin balance becomes 0 the next time they open the game.', ok: 'Set to 0', danger: true })) act('wipeGold').then(() => toast('Coins cleared')); };
+    $('#iapBtn').onclick = () => act('resetIap').then(() => toast('Timer reset'));
     $('#renameBtn').onclick = async () => { const v = await dialog({ title: 'Rename player', fields: [{ label: 'New name (3–12 letters, numbers, space, _ -)', value: u.name }], ok: 'Rename' }); if (v) act('rename', { name: v[0] }); };
     $('#pwBtn').onclick = async () => { const v = await dialog({ title: 'Reset password', text: 'They will be signed out everywhere and need this new password.', fields: [{ label: 'New password (6+ characters)', type: 'text' }], ok: 'Reset' }); if (v) act('resetpw', { password: v[0] }).then(() => toast('Password reset')); };
     $('#kickBtn').onclick = () => act('kick').then(() => toast('Signed out'));
@@ -283,6 +309,42 @@ async function openPlayer(id) {
     $('#saveBtn').onclick = async () => { if (await dialog({ title: 'Delete cloud save?', text: 'Their save is removed from the server. Their device keeps its own copy.', ok: 'Delete', danger: true })) act('clearSave'); };
     $('#delBtn').onclick = async () => { const v = await dialog({ title: 'Delete ' + u.name + '?', text: 'This permanently removes the account, save and score. Type the name to confirm.', fields: [{ label: 'Type "' + u.name + '"' }], ok: 'Delete forever', danger: true }); if (v && v[0] === u.name) { await api('POST', 'action', { id, action: 'delete' }).then(() => { toast('Account deleted'); closeSheet(); go('#/players'); }).catch(fail); } else if (v) toast('Name did not match'); };
   } catch (e) { closeSheet(); fail(e); }
+}
+
+// ---- Live view + pranks: who is in the game right now, a snapshot of their screen, and one-tap harmless pranks
+let liveTimer = null, liveSel = null, liveAll = false;
+const PRANKS = [
+  ['flip', '🙃', 'Upside down', 'Screen flipped 180° (taps still work)', 12], ['mirror', '🪞', 'Mirror', 'Left and right swapped', 12],
+  ['wobble', '🌊', 'Wobble', 'Screen sways like a boat', 12], ['rainbow', '🌈', 'Rainbow', 'Colours cycle wildly', 12],
+  ['invert', '🔄', 'Inverted', 'Negative colours', 10], ['gray', '🩶', 'Grayscale', 'Old black and white TV', 12],
+  ['sepia', '📜', 'Old photo', 'Sepia and saturation', 12], ['blur', '😵', 'Blurry', 'Needs glasses', 10],
+  ['tiny', '🔬', 'Tiny game', 'Shrunk to half size', 12], ['zoomies', '⚡', 'Zoomies', 'Super saturated', 10],
+  ['sound', '🔔', 'Sound spam', 'Plays random game sounds', 8], ['fakegold', '🤑', 'Fake jackpot', '"+1,000,000 gold" ... just kidding', 0],
+  ['toast', '🏆', 'Fake achievement', 'Pops an achievement banner', 0], ['message', '💬', 'Send message', 'Pop-up dialog with your text', 0],
+];
+async function live() {
+  const m = $('#main');
+  m.innerHTML = '<h2>Live &amp; Pranks</h2><p class="sub">Players who are in the game right now (updates every 2 seconds). Pick one, watch their screen, and play a harmless, time-limited prank. Nothing touches their save.</p><div class="live"><div class="card" id="lvList"><h3>Online now</h3><div class="empty">Loading…</div></div><div class="card" id="lvView"><div class="empty">Pick a player on the left.</div></div></div>';
+  let players = [];
+  const draw = () => {
+    if (!$('#lvList')) return;
+    $('#lvList').innerHTML = '<h3>Online now <span class="badge">' + players.length + '</span></h3>' + (players.length ? players.map((p) => `<button class="pl ${p.id === liveSel ? 'on' : ''}" data-id="${p.id}">${p.thumb ? `<img src="${p.thumb}" alt="">` : '<img alt="">'}<div class="grow"><div class="nm"><span class="dot"></span>${esc(p.name)}</div><div class="mute">${esc(p.state.screen || '?')}${p.state.score ? ' · ' + fmt(p.state.score) + ' pts' : ''}</div></div></button>`).join('') : '<div class="empty">Nobody is playing right now.<br>Players show up here while the game is open and signed in.</div>');
+    $('#lvList').querySelectorAll('.pl').forEach((b) => b.onclick = () => { liveSel = +b.dataset.id; liveAll = false; draw(); });
+    const v = $('#lvView'), p = players.find((x) => x.id === liveSel);
+    if (!p && !liveAll) { v.innerHTML = '<div class="empty">Pick a player on the left.</div>'; return; }
+    const head = liveAll ? `<h3>Everyone online (${players.length})</h3>` : `<h3>${esc(p.name)} <a class="link mute" onclick="go('#/players/${p.id}')">open profile</a></h3>`;
+    const view = liveAll ? '' : `<div class="screen">${p.thumb ? `<img src="${p.thumb}" alt="Their screen">` : '<div class="empty">No snapshot yet</div>'}<div class="kv"><div><small>Screen</small>${esc(p.state.screen || '?')}</div><div><small>Score</small>${fmt(p.state.score)}</div><div><small>Level</small>${p.state.level || '—'}</div><div><small>Rank</small>${p.state.rank || '—'}</div><div><small>Gold</small>${fmt(p.state.gold)}</div><div><small>Active pranks</small>${(p.state.effects || []).join(', ') || 'none'}</div></div></div>`;
+    v.innerHTML = head + `<div class="tgt"><button class="chip ${liveAll ? 'on' : ''}" id="allBtn">🎉 Prank everyone online</button></div>` + view + `<div class="pranks">${PRANKS.map((q) => `<button class="btn" data-k="${q[0]}"><span>${q[1]}</span>${q[2]}<small>${q[3]}</small></button>`).join('')}</div>`;
+    $('#allBtn').onclick = () => { liveAll = !liveAll; if (liveAll) liveSel = null; draw(); };
+    v.querySelectorAll('.pranks .btn').forEach((b) => b.onclick = async () => {
+      const q = PRANKS.find((x) => x[0] === b.dataset.k), body = { id: liveAll ? 'all' : liveSel, type: q[0], secs: q[4] };
+      if (q[0] === 'message') { const r = await dialog({ title: 'Send a pop-up', fields: [{ label: 'Title (40 max)', value: 'Hello!' }, { label: 'Message (140 max)', value: 'I can see you...' }], ok: 'Send it' }); if (!r) return; body.text = r[0]; body.text2 = r[1]; }
+      if (q[0] === 'toast') { const r = await dialog({ title: 'Fake achievement', fields: [{ label: 'Title', value: 'Achievement unlocked!' }, { label: 'Subtitle', value: 'Stared at the screen' }], ok: 'Send it' }); if (!r) return; body.text = r[0]; body.text2 = r[1]; }
+      api('POST', 'prank', body).then((j) => toast('Sent to ' + j.sent + (j.sent === 1 ? ' player 😈' : ' players 😈'))).catch(fail);
+    });
+  };
+  const tick = async () => { try { players = (await api('GET', 'live')).players; if ($('#dlgWrap').classList.contains('hidden')) draw(); } catch (e) { clearInterval(liveTimer); fail(e); } };
+  await tick(); liveTimer = setInterval(tick, 2000);
 }
 
 // ---- Leaderboard

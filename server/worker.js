@@ -46,14 +46,18 @@ async function newSession(env, userId) {
   return tok;
 }
 
-const profile = (u, extra = {}) => ({ id: u.id, name: u.name, refCode: u.ref_code, pendingGold: Math.max(0, u.earned_gold - u.claimed_gold), ...extra });
+const profile = (u, extra = {}) => ({ id: u.id, name: u.name, refCode: u.ref_code, pendingGold: Math.max(0, u.earned_gold - u.claimed_gold), lastIap: u.last_iap || 0, ...extra });
+const iapCooldown = (env) => Math.round((+env.IAP_COOLDOWN_DAYS || 3) * 86400);
+const remain = (s) => { const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.ceil((s % 3600) / 60); return d ? d + ' day' + (d > 1 ? 's' : '') + (h ? ' ' + h + ' h' : '') : h ? h + ' h ' + m + ' min' : m + ' min'; };
 
 // hand over everything the user has earned and not yet received (atomic: only one request can win a given amount)
+// returns what the game must apply to its save, in this order: wipe (coins to 0), take (remove coins), gold (add coins)
 async function claimAll(env, userId) {
-  const u = await env.DB.prepare('SELECT earned_gold e, claimed_gold c FROM users WHERE id = ?').bind(userId).first();
-  if (!u || u.e <= u.c) return 0;
-  const r = await env.DB.prepare('UPDATE users SET claimed_gold = ? WHERE id = ? AND claimed_gold = ?').bind(u.e, userId, u.c).run();
-  return r.meta.changes === 1 ? u.e - u.c : 0;
+  const none = { gold: 0, take: 0, wipe: false };
+  const u = await env.DB.prepare('SELECT earned_gold e, claimed_gold c, take_gold t, wipe_gold w FROM users WHERE id = ?').bind(userId).first();
+  if (!u || (u.e <= u.c && !u.t && !u.w)) return none;
+  const r = await env.DB.prepare('UPDATE users SET claimed_gold = ?, take_gold = 0, wipe_gold = 0 WHERE id = ? AND claimed_gold = ? AND take_gold = ? AND wipe_gold = ?').bind(u.e, userId, u.c, u.t, u.w).run();
+  return r.meta.changes === 1 ? { gold: Math.max(0, u.e - u.c), take: u.t, wipe: !!u.w } : none;
 }
 
 const routes = {
@@ -137,24 +141,41 @@ const routes = {
     return J({ entries: rows.results, me });
   },
 
+  // ---- live view: heartbeat in, queued pranks out (pranks are deleted once handed over)
+  async 'POST /api/live'(req, env, u) {
+    const b = await body(req, 30000), t = now();
+    const st = b.state && typeof b.state === 'object' ? JSON.stringify({ screen: String(b.state.screen || '').slice(0, 30), score: +b.state.score || 0, level: +b.state.level || 0, gold: +b.state.gold || 0, rank: +b.state.rank || 0, effects: Array.isArray(b.state.effects) ? b.state.effects.slice(0, 10).map(String) : [] }) : null;
+    const th = typeof b.thumb === 'string' && b.thumb.startsWith('data:image/jpeg;base64,') && b.thumb.length < 20000 ? b.thumb : null;
+    await env.DB.prepare('INSERT INTO live (user_id, seen, state, thumb) VALUES (?1, ?2, ?3, ?4) ON CONFLICT(user_id) DO UPDATE SET seen = ?2, state = ?3, thumb = COALESCE(?4, thumb)').bind(u.id, t, st, th).run();
+    const q = await env.DB.prepare('SELECT id, data FROM pranks WHERE user_id = ? AND at > ? ORDER BY id LIMIT 10').bind(u.id, t - 120).all();
+    if (q.results.length) await env.DB.prepare('DELETE FROM pranks WHERE user_id = ?').bind(u.id).run();
+    return J({ pranks: q.results.map((r) => { try { return JSON.parse(r.data); } catch (e) { return null; } }).filter(Boolean) });
+  },
+
   // ---- referral codes
   async 'POST /api/redeem'(req, env, u) {
     const { code } = await body(req, 500);
     const r = await redeem(env, u.id, code);
-    return r.ok ? J({ ...r, gold: await claimAll(env, u.id) }) : bad(r.error, r.status || 400);
+    return r.ok ? J({ ...r, ...(await claimAll(env, u.id)) }) : bad(r.error, r.status || 400);
   },
   async 'POST /api/claim'(req, env, u) {
-    return J({ gold: await claimAll(env, u.id) });
+    return J(await claimAll(env, u.id));
   },
 
   // ---- free in-app purchases: every pack is granted at no cost (our own packs, see IAP_PACKS)
-  async 'GET /api/iap'() { return J({ packs: IAP_PACKS }); },
+  async 'GET /api/iap'(req, env) { return J({ packs: IAP_PACKS, cooldown: iapCooldown(env) }); },
   async 'POST /api/iap'(req, env, u) {
     const { pack } = await body(req, 500);
     const g = IAP_PACKS[pack];
     if (!g) return bad('Unknown pack');
-    await env.DB.prepare('UPDATE users SET earned_gold = earned_gold + ? WHERE id = ?').bind(g, u.id).run();
-    return J({ ok: true, gold: await claimAll(env, u.id) });
+    // one free pack per account per cooldown (3 days); the condition makes it atomic, so two quick taps cannot both win
+    const t = now(), cd = iapCooldown(env);
+    const r = await env.DB.prepare('UPDATE users SET last_iap = ?, earned_gold = earned_gold + ? WHERE id = ? AND last_iap <= ?').bind(t, g, u.id, t - cd).run();
+    if (r.meta.changes !== 1) {
+      const row = await env.DB.prepare('SELECT last_iap FROM users WHERE id = ?').bind(u.id).first(), left = row.last_iap + cd - t;
+      return J({ error: 'You can claim free gold again in ' + remain(Math.max(60, left)) + '.', lastIap: row.last_iap, wait: left }, 429);
+    }
+    return J({ ok: true, lastIap: t, ...(await claimAll(env, u.id)) });
   },
 };
 

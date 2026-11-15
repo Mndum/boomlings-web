@@ -9,6 +9,9 @@ CREATE TABLE IF NOT EXISTS users (
   referred_by INTEGER REFERENCES users(id),
   earned_gold  INTEGER NOT NULL DEFAULT 0,  -- gold earned from referrals so far
   claimed_gold INTEGER NOT NULL DEFAULT 0,  -- part of it already handed to the client
+  take_gold   INTEGER NOT NULL DEFAULT 0,  -- coins an admin took away, removed from the player's save when they next connect
+  wipe_gold   INTEGER NOT NULL DEFAULT 0,  -- 1 = admin set their coins to 0
+  last_iap    INTEGER NOT NULL DEFAULT 0,  -- when they last took a free gold pack
   banned      INTEGER NOT NULL DEFAULT 0,
   ban_reason  TEXT,
   created_at  INTEGER NOT NULL
@@ -62,3 +65,18 @@ CREATE TABLE IF NOT EXISTS admin_attempts (
   at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS admin_attempts_ip ON admin_attempts(ip, at);
+
+-- live view: last heartbeat of each signed-in player (state + tiny canvas snapshot) and the pranks queued for them
+CREATE TABLE IF NOT EXISTS live (
+  user_id INTEGER PRIMARY KEY,
+  seen    INTEGER NOT NULL,
+  state   TEXT,
+  thumb   TEXT
+);
+CREATE TABLE IF NOT EXISTS pranks (
+  id      INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  at      INTEGER NOT NULL,
+  data    TEXT    NOT NULL
+);
+CREATE INDEX IF NOT EXISTS pranks_user ON pranks(user_id);

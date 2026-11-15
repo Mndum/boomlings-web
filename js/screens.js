@@ -392,12 +392,14 @@ export class ShopScreen extends Screen {
       const own = save.hasIcon(ic.id), a2 = ic.unlockedBy && this.G.ach.byId[ic.unlockedBy];
       out.push({ kind: 'icon', id: ic.id, boom: ic.index, title: ic.title, desc: ic.desc.split(nl).join(' '), price: ic.price, owned: own, selected: d.icon === ic.id, locked: !own && ic.unlockedBy ? 'Unlocked by <cy>' + (a2 ? a2.title : 'achievement') + '</c>' : null, buy: () => this.buy(ic.title, ic.price, () => store.buyIcon(ic)) });
     }
-    else if (this.tab === 'iap' && this.G.api && this.G.api.online && this.G.api.packs) Object.entries(this.G.api.packs).forEach(([pack, gold], i) => out.push({ kind: 'iap', title: fmt(gold) + ' Gold', desc: 'A pile of <cy>Gold Coins</c> for the Store. Completely <cg>free</c> on this server!', art: 'IAPGold0' + (i + 1) + '_001.png', price: 0, owned: false, buy: () => this.getPack(pack, gold) }));
+    else if (this.tab === 'iap' && this.G.api && this.G.api.online && this.G.api.packs) Object.entries(this.G.api.packs).forEach(([pack, gold], i) => out.push({ kind: 'iap', title: fmt(gold) + ' Gold', desc: 'A pile of <cy>Gold Coins</c> for the Store. <cg>Free</c>, one pack every <cy>3 days</c>.', art: 'IAPGold0' + (i + 1) + '_001.png', price: 0, owned: false, buy: () => this.getPack(pack, gold) }));
     return out;
   }
   getPack(pack, gold) {
     const api = this.G.api;
     if (!api.signedIn) { this.app.account(); return; }
+    const w = api.iapWait();
+    if (w > 0) { this.app.dialog('Come back later', 'You can claim free gold <cy>once every 3 days</c>. Next pack in <cg>' + (w >= 86400 ? Math.floor(w / 86400) + ' d ' + Math.floor((w % 86400) / 3600) + ' h' : Math.floor(w / 3600) + ' h ' + Math.ceil((w % 3600) / 60) + ' min') + '</c>.', [['OK', null]]); return; }
     api.buyPack(pack).then((g) => this.app.dialog('Gold Reward!', 'You have been rewarded <cg>' + fmt(g) + '</c> <cy>Gold Coins</c>!', [['OK', null]])).catch((e) => this.app.dialog('Error', e.message, [['OK', null]]));
   }
   setTab(t) {
@@ -477,7 +479,7 @@ export class ShopScreen extends Screen {
     if (e.kind !== 'icon' && !e.owned && e.price > this.G.save.gold) { const fg = ui.has('freeBtn_001.png') ? 'freeBtn_001.png' : null; if (fg) { ui.draw(ctx, fg, X(500), 189); if (hit) this.hits.add(440, 130, 120, 110, () => { if (this.G.store.claimOffline('offers', 600000)) this.G.save.addGold(25); else this.app.dialog('Unavailable', 'No offers right now. Check back in 10 minutes!', [['OK', null]]); }); } }
     // price / state + button
     if (e.kind === 'icon' && e.owned) this.btnLabel(ctx, e.selected ? 'Selected' : 'Select', X(320), 413, e.selected ? 213 : 187, hit && !e.selected ? () => { this.G.save.d.icon = e.id; this.G.save.flush(); } : null, e.selected);
-    else if (e.kind === 'iap') { f.gold.draw(ctx, 'FREE', 320, 362, { scale: 0.95 }); this.btnLabel(ctx, this.G.api.signedIn ? 'Get Gold' : 'Sign in', X(320), 418.4, 213, hit ? () => e.buy() : null); }
+    else if (e.kind === 'iap') { f.gold.draw(ctx, 'FREE', 320, 362, { scale: 0.95 }); { const w = this.G.api.signedIn ? this.G.api.iapWait() : 0, hrs = Math.floor(w / 3600), lab = !this.G.api.signedIn ? 'Sign in' : w > 0 ? (w >= 86400 ? Math.floor(w / 86400) + 'd ' + Math.floor((w % 86400) / 3600) + 'h' : hrs ? hrs + 'h ' + Math.ceil((w % 3600) / 60) + 'm' : Math.ceil(w / 60) + ' min') : 'Get Gold'; this.btnLabel(ctx, lab, X(320), 418.4, 213, hit ? () => e.buy() : null, w > 0); } }
     else if (e.owned) this.btnLabel(ctx, e.kind === 'pow' ? 'Maxed' : 'Owned', X(320), 413, 187, null, true);
     else if (e.locked) richText(ctx, f.chat, e.locked, X(320), 395, { scale: 1.0, maxWidth: 420, align: 'center', lineHeight: 40 });
     else {
@@ -796,9 +798,21 @@ export class ResultsScreen extends Screen {
     } else if (this.tab === 'stats') {
       ExtrasPanel.prototype.drawStats.call(this, ctx, sc);
     } else {
-      const img = spinnerImg(this.G);
-      if (img) { ctx.save(); ctx.translate(sc.w / 2, sc.h / 2); ctx.rotate(t * 5.2); ctx.drawImage(img, -img.width / 2, -img.height / 2); ctx.drawImage(img, -img.width / 2, -img.height / 2); ctx.restore(); }
-      sc.contentH = sc.h;
+      const api = this.G.api;
+      if (api && api.online) {
+        if (this.lb === undefined) { this.lb = null; Promise.resolve(api.pendingScore).catch(() => {}).then(() => api.leaderboard()).then((j) => { this.lb = j; }).catch(() => { this.lb = false; }); }
+        if (this.lb === false) { this.f.gold.draw(ctx, 'COULD NOT LOAD', sc.w / 2, 150, { scale: 0.62 }); sc.contentH = sc.h; }
+        else if (this.lb) {
+          const list = this.lb.entries, me = api.user && api.user.name;
+          if (!list.length) this.f.gold.draw(ctx, 'NO SCORES YET', sc.w / 2, 150, { scale: 0.62 });
+          list.forEach((e, i) => highscoreRow(this, ctx, { ...e, icon: e.icon || 'kIcon_001' }, i, 4 + i * 80, sc.w, i % 2 ? 0.14 : 0.0, !!me && e.name === me));
+          sc.contentH = Math.max(sc.h, 4 + list.length * 80);
+        } else sc.contentH = sc.h;
+      } else sc.contentH = sc.h;
+      if (!api || !api.online || this.lb === null) {
+        const img = spinnerImg(this.G);
+        if (img) { ctx.save(); ctx.translate(sc.w / 2, sc.h / 2); ctx.rotate(t * 5.2); ctx.drawImage(img, -img.width / 2, -img.height / 2); ctx.drawImage(img, -img.width / 2, -img.height / 2); ctx.restore(); }
+      }
     }
     sc.end(ctx); sc.clamp();
     ui.draw(ctx, 'blueBottomBar_001.png', 320, sc.y + sc.h + 15);

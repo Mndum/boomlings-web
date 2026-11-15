@@ -13,6 +13,7 @@ import { Screen, MenuScreen, PowerSelectScreen, ResultsScreen, Dialog, TutorialP
 import { ExtrasScreen, IconSelect, ContinuePanel } from './extras.js';
 import { FreeGoldScreen } from './freegold.js';
 import { Api } from './api.js';
+import { Pranks } from './pranks.js';
 import { accountFlow } from './account.js';
 
 const canvas = document.getElementById('game');
@@ -194,7 +195,7 @@ async function boot() {
     G.lib = await AnimLibrary.load('assets/', obj); G.libXL = new AnimLibrary(G.lib.defs, G.lib.descs, menu); // xl_Block frames live in menuSheet
     G.fx = await Particles.load('assets/', await Atlas.load('assets/particleImgSheet'));
     G.store = await Store.load(save, ach); ach.store = G.store;
-    G.api = new Api(G); G.api.init();   // optional backend: stays offline when the site is not served with the Worker
+    G.api = new Api(G); G.api.init().then(() => { G.pranks = new Pranks(G, app, canvas, W, CH); G.pranks.start(); });   // optional backend: stays offline when the site is not served with the Worker
     ach.onUnlock = (a) => app.toast('Achievement unlocked!', a.title, 'getAch001.ogg');
     ach.onIconUnlock = (ic) => app.toast('You unlocked ' + ic.title + '!', 'New icon', 'unlock004.ogg');
     G.audio.musicOn = save.d.opts.music; G.audio.enabled = save.d.opts.sfx; G.audio.mv = save.d.opts.mv ?? 1; G.audio.sv = save.d.opts.sv ?? 1;
@@ -255,7 +256,9 @@ function drawToasts(dt) {
 
 function toCanvas(ev) {
   const r = canvas.getBoundingClientRect();
-  return [((ev.clientX - r.left) / r.width) * W, ((ev.clientY - r.top) / r.height) * CH - OY];
+  let fx = (ev.clientX - r.left) / r.width, fy = (ev.clientY - r.top) / r.height;
+  if (G.pranks) [fx, fy] = G.pranks.fix(fx, fy);
+  return [fx * W, fy * CH - OY];
 }
 let dragging = false;
 canvas.addEventListener('pointerdown', (ev) => {

@@ -18,3 +18,4 @@ database_id = "1f610573-6219-4be5-a04b-39439231cd6b"
 REF_REWARD_NEW = "100"     # gold for the player who enters a code
 REF_REWARD_OWNER = "100"   # gold for the code's owner
 REF_MAX_PER_OWNER = "50"
+IAP_COOLDOWN_DAYS = "3"    # one free gold pack per account per this many days
