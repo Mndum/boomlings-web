@@ -142,7 +142,7 @@ export class OptionsPanel extends SlidePanel {
 
 // ---------------------------------------------------------------- IconSelectLayer: big icon + name, 4x4 grid per page
 export class IconSelect extends SlidePanel {
-  constructor(app) { super(app); this.page = 0; this.sel = null; this.silc = {}; }
+  constructor(app) { super(app); this.page = 0; this.sel = null; this.silc = {}; app.tutorial('icon', 'tutorial_icon'); }
   items() { return this.G.store.icons; }
   sil(index) {
     if (this.silc[index]) return this.silc[index];
@@ -168,8 +168,10 @@ export class IconSelect extends SlidePanel {
       const x = xs[k % 4], y = ys[Math.floor(k / 4)], own = save.hasIcon(ic.id);
       if (hidden(ic)) { { const sl = this.sil(ic.index); ctx.drawImage(sl, x - sl.width * 0.37, y - sl.height * 0.37, sl.width * 0.74, sl.height * 0.74); } ui.draw(ctx, 'questionMark_001.png', x, y, { scale: 0.8 }); }
       else {
+        ctx.save(); if (!own) ctx.filter = 'brightness(0.42)';   // locked icons are shown dimmed in the real game
         this.G.icons.draw(ctx, 'boomIcon_' + String(ic.index).padStart(2, '0') + '_001.png', x, y, { scale: 0.74, alpha: 1 });
-        if (!own) { ui.draw(ctx, 'lock_icon_001.png', x, y + 4, { scale: 0.62 }); f.gold.draw(ctx, String(ic.price), x - 8, y + 54, { scale: 0.45 }); this.coin(ctx, x + 22, y + 54, 26); }
+        ctx.restore();
+        if (!own) { ui.draw(ctx, 'lock_icon_001.png', x, y + 4, { scale: 0.62 }); f.gold.draw(ctx, String(ic.price), x - 8, y + 49, { scale: 0.45 }); this.coin(ctx, x + 24, y + 49, 26); }
       }
       this.hits.add(x - 50, y - 50, 100, 100, () => { this.sel = ic; if (own) { d.icon = ic.id; save.flush(); } else if (!hidden(ic)) this.buy(ic); });
     }
