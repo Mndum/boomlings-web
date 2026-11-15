@@ -70,7 +70,7 @@ class PauseScreen extends Screen {
     f.gold.draw(c, 'Time:', 307, 221.33, { align: 'right', scale: 0.79 });
     (f.numbers || f.gold).draw(c, t, 320, 219.33, { align: 'left', scale: 0.7 });
     this.button(c, 'Main Menu', 320, 293.63, 216, 33, () => this.confirmMenu(), { scale: 1 });
-    this.button(c, 'Free Gold', 320, 400, 216, 33, () => this.app.netError(), { scale: 1 });
+    this.button(c, 'Free Gold', 320, 400, 216, 33, () => this.app.go(new FreeGoldScreen(this.app)), { scale: 1 });   // same Free Gold screen as the main menu
     this.button(c, 'Upgrade', 320, 506, 216, 33, () => this.app.go(new ShopScreen(this.app)), { scale: 1 });   // real: opens the Store (MoveTo 1.0 BounceOut drop)
     [['Music', save.d.opts.mv ?? 1], ['Effects', save.d.opts.sv ?? 1]].forEach(([lab, v], i) => {
       const g = this.sliderGeom(i);
