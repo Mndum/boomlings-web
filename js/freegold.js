@@ -1,6 +1,7 @@
 // FreeGoldLayer (MenuLayer::onGold -> CCTransitionFade -> FreeGoldLayer::scene). Positions are the original game's own values (Frida scene dump
 // of the running game), canvas px = (2x, 1013.333 - 2y) for layer coordinates (x, y).
 import { Screen } from './screens.js';
+import { recruit, enterCode } from './account.js';
 
 const Y = (y) => 1013.333 - 2 * y;
 const URL = { fb: 'http://www.robtopgames.com/boomlings/facebook', tw: 'http://www.robtopgames.com/boomlings/twitter', yt: 'http://www.robtopgames.com/boomlings/youtube' };
@@ -59,8 +60,8 @@ export class FreeGoldScreen extends Screen {
       const bonus = done ? ['menu', 'doneBonus_001.png'] : k === 'rate' ? ['sheet2', 'freeGoldBonus200_001.png'] : ['menu', 'freeGoldBonus_001.png'];
       this.item(ctx, atlas, name, bonus[0] === 'menu' ? menu : sheet2, bonus[1], 320, Y(ly), 0.9, 58, 23.5, () => this.open(k));
     }
-    this.item(ctx, menu, 'longRecruitBtn_001.png', menu, 'freeGoldBonus2_001.png', 320, Y(214.67), 1, 58, 16.5, () => this.app.netError());
-    this.item(ctx, menu, 'longEnterRefBtn_001.png', menu, 'freeGoldBonus2_001.png', 320, Y(182.67), 1, 58, 16.5, () => this.app.netError());
+    this.item(ctx, menu, 'longRecruitBtn_001.png', menu, 'freeGoldBonus2_001.png', 320, Y(214.67), 1, 58, 16.5, () => recruit(this.app));
+    this.item(ctx, menu, 'longEnterRefBtn_001.png', menu, 'freeGoldBonus2_001.png', 320, Y(182.67), 1, 58, 16.5, () => enterCode(this.app));
     menu.draw(ctx, 'freeGoldLabel_001.png', 320, Y(441.67));
     menu.draw(ctx, 'recruitAFriendBar_001.png', 320, Y(246.67));
     menu.draw(ctx, 'IAPGold04_001.png', 320, Y(63.67));

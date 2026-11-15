@@ -23,7 +23,7 @@ To keep it private, add a Cloudflare Access policy (Zero Trust, free up to 50 us
 | `GET /api/me` | profile, own referral code, referral count |
 | `GET/PUT /api/save` | cloud save (`PUT {data, base}`; 409 + server copy if stale, `force` overrides) |
 | `POST /api/score {score,level,icon}` | submit a result (keeps the best) |
-| `GET /api/leaderboard?kind=score\|level&limit=50` | top list + your rank |
+| `GET /api/leaderboard?limit=50` | top list (level, then score) + your rank |
 | `POST /api/redeem {code}` | enter someone's referral code (once per account) |
 | `POST /api/claim` | collect referral gold not yet received |
 | `GET /api/iap`, `POST /api/iap {pack}` | free gold packs |

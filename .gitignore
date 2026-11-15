@@ -1,0 +1,3 @@
+server/dev.sqlite*
+node_modules
+.wrangler

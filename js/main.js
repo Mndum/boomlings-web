@@ -12,6 +12,8 @@ import { W, H, CH, OY, panel, pillBtn, Hits, roundRect } from './ui.js';
 import { Screen, MenuScreen, PowerSelectScreen, ResultsScreen, Dialog, TutorialPopup, DailyRewardScreen, ExtrasPanel, ShopScreen, ConfirmPurchase, ShareDialog, easeIO, SLIDE_T, PX, PY } from './screens.js';
 import { ExtrasScreen, IconSelect, ContinuePanel } from './extras.js';
 import { FreeGoldScreen } from './freegold.js';
+import { Api } from './api.js';
+import { accountFlow } from './account.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -114,6 +116,7 @@ class App {
     try { const img = await loadImage('assets/' + file + '-hd.png'); this.go(new TutorialPopup(this, img, done)); } catch (e) { if (done) done(); }
   }
   dialog(t, m, b) { this.go(new Dialog(this, t, m, b)); }
+  account() { return accountFlow(this); }
   netError() { this.go(new Dialog(this, 'Error', 'Something went wrong. Please try again later!', [['OK', null]], true)); } // offline: LoadingCircle, then the same error the real game shows now that its servers are gone
   toast(title, sub, sfx) { this.toasts.push({ title, sub, t: 0 }); if (sfx) G.audio.play(sfx, 0.8); }
   toMenu() {
@@ -191,6 +194,7 @@ async function boot() {
     G.lib = await AnimLibrary.load('assets/', obj); G.libXL = new AnimLibrary(G.lib.defs, G.lib.descs, menu); // xl_Block frames live in menuSheet
     G.fx = await Particles.load('assets/', await Atlas.load('assets/particleImgSheet'));
     G.store = await Store.load(save, ach); ach.store = G.store;
+    G.api = new Api(G); G.api.init();   // optional backend: stays offline when the site is not served with the Worker
     ach.onUnlock = (a) => app.toast('Achievement unlocked!', a.title, 'getAch001.ogg');
     ach.onIconUnlock = (ic) => app.toast('You unlocked ' + ic.title + '!', 'New icon', 'unlock004.ogg');
     G.audio.musicOn = save.d.opts.music; G.audio.enabled = save.d.opts.sfx; G.audio.mv = save.d.opts.mv ?? 1; G.audio.sv = save.d.opts.sv ?? 1;

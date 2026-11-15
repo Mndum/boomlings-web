@@ -117,7 +117,7 @@ export class OptionsPanel extends SlidePanel {
     { const g = ctx.createLinearGradient(0, 160, 0, 900); g.addColorStop(0, '#00304c'); g.addColorStop(0.35, '#003750'); g.addColorStop(1, '#001f31'); ctx.fillStyle = g; roundRect(ctx, 60, 158.7, 520, 740, 16); ctx.fill(); }
     this.button(ctx, 'Reset Tutorial', 320, 286.7, 216, 33, () => this.app.dialog('Reset Tutorial', 'Do you want to <cg>reset</c> the <cy>Tutorial</c>? All guides and hints will be reset.', [['Cancel', null], ['Yes', () => { d.tut = {}; save.flush(); }]]), { scale: 1 });
     this.button(ctx, 'Support', 320, 393, 216, 33, () => this.app.netError(), { scale: 1 });
-    this.pressed(ctx, 204, 466, 232, 80, 320, 506, () => ui.draw(ctx, 'fbLogInBtn_001.png', 320, 506)); this.hits.add(204, 466, 232, 80, () => this.app.netError());
+    this.pressed(ctx, 204, 466, 232, 80, 320, 506, () => ui.draw(ctx, 'fbLogInBtn_001.png', 320, 506)); this.hits.add(204, 466, 232, 80, () => this.app.account());
     [['Music', d.opts.mv ?? 1], ['Effects', d.opts.sv ?? 1]].forEach(([lab, v], i) => {
       const g = this.geom(i), gr = this.G.img.groove, bar = this.G.img.sliderbar, tx = g.x + (g.w - 13) * v;
       f.gold.draw(ctx, lab + ', ' + Math.round(v * 100) + '%', 320, g.y - 40, { scale: 0.79 });

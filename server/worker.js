@@ -23,7 +23,7 @@ const NAME_RE = /^[A-Za-z0-9 _-]{3,12}$/;
 const now = () => Math.floor(Date.now() / 1000);
 
 // Free "in-app purchases": every pack is granted for nothing (the packs themselves are our own choice; the store data has none)
-const IAP_PACKS = { gold_small: 500, gold_medium: 1500, gold_large: 5000, gold_huge: 15000 };
+const IAP_PACKS = { gold_1: 500, gold_2: 1200, gold_3: 3000, gold_4: 7500, gold_5: 20000 }; // art: IAPGold01..05
 
 async function body(req, max = 300000) {
   const t = await req.text();
@@ -115,23 +115,23 @@ const routes = {
 
   // ---- leaderboards
   async 'POST /api/score'(req, env, u) {
-    const { score, level, icon } = await body(req, 2000);
+    const { score, level, icon, rank } = await body(req, 2000);
     const sc = Math.floor(+score), lv = Math.floor(+level);
     if (!(sc >= 0 && sc <= 1e9) || !(lv >= 0 && lv <= 10000)) return bad('Invalid score');
-    const ic = typeof icon === 'string' && /^kIcon_\d{3}$/.test(icon) ? icon : null;
-    await env.DB.prepare('INSERT INTO scores (user_id, best_score, best_level, icon, updated_at) VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT(user_id) DO UPDATE SET best_score = MAX(best_score, ?2), best_level = MAX(best_level, ?3), icon = COALESCE(?4, icon), updated_at = ?5').bind(u.id, sc, lv, ic, now()).run();
+    const rk = Math.min(60, Math.max(1, Math.floor(+rank) || 1)), ic = typeof icon === 'string' && /^kIcon_\d{3}$/.test(icon) ? icon : null;
+    await env.DB.prepare('INSERT INTO scores (user_id, best_score, best_level, icon, rank, updated_at) VALUES (?1, ?2, ?3, ?4, ?6, ?5) ON CONFLICT(user_id) DO UPDATE SET best_score = MAX(best_score, ?2), best_level = MAX(best_level, ?3), icon = COALESCE(?4, icon), rank = ?6, updated_at = ?5').bind(u.id, sc, lv, ic, now(), rk).run();
     return J({ ok: true });
   },
+  // ordered like the game's own local list: highest level first, then score
   async 'GET /api/leaderboard'(req, env, u) {
-    const url = new URL(req.url), kind = url.searchParams.get('kind') === 'level' ? 'best_level' : 'best_score';
-    const limit = Math.min(100, Math.max(1, +url.searchParams.get('limit') || 50));
-    const rows = await env.DB.prepare(`SELECT u.name, s.${kind} AS value, s.icon FROM scores s JOIN users u ON u.id = s.user_id WHERE s.${kind} > 0 ORDER BY s.${kind} DESC, s.updated_at ASC LIMIT ?`).bind(limit).all();
+    const limit = Math.min(100, Math.max(1, +new URL(req.url).searchParams.get('limit') || 50));
+    const rows = await env.DB.prepare('SELECT u.name AS name, s.best_score AS score, s.best_level AS level, s.icon AS icon, s.rank AS rank FROM scores s JOIN users u ON u.id = s.user_id WHERE s.best_score > 0 ORDER BY s.best_level DESC, s.best_score DESC, s.updated_at ASC LIMIT ?').bind(limit).all();
     let me = null;
     if (u) {
-      const s = await env.DB.prepare(`SELECT ${kind} AS value FROM scores WHERE user_id = ?`).bind(u.id).first();
-      if (s && s.value > 0) me = { value: s.value, rank: 1 + (await env.DB.prepare(`SELECT COUNT(*) n FROM scores WHERE ${kind} > ?`).bind(s.value).first()).n };
+      const s = await env.DB.prepare('SELECT best_score score, best_level level FROM scores WHERE user_id = ?').bind(u.id).first();
+      if (s && s.score > 0) me = { ...s, rank: 1 + (await env.DB.prepare('SELECT COUNT(*) n FROM scores WHERE best_level > ?1 OR (best_level = ?1 AND best_score > ?2)').bind(s.level, s.score).first()).n };
     }
-    return J({ kind: kind === 'best_level' ? 'level' : 'score', entries: rows.results, me });
+    return J({ entries: rows.results, me });
   },
 
   // ---- referral codes

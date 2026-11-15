@@ -29,7 +29,8 @@ export class Save {
     } catch (e) { /* storage unavailable: run in memory */ }
   }
   reset() { this.d = defaults(); this.flush(); }
-  flush() { try { localStorage.setItem(KEY, JSON.stringify(this.d)); } catch (e) { /* ignore */ } }
+  flushLocal() { try { localStorage.setItem(KEY, JSON.stringify(this.d)); } catch (e) { /* ignore */ } }
+  flush() { this.flushLocal(); if (this.onFlush) this.onFlush(); }   // onFlush: the cloud-save hook (api.js)
   seen(k) { return !!(this.d.tut && this.d.tut[k]); }
   markSeen(k) { this.d.tut = this.d.tut || {}; this.d.tut[k] = 1; this.flush(); }
   get gold() { return this.d.gold; }

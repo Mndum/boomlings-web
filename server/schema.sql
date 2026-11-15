@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS scores (
   best_score INTEGER NOT NULL DEFAULT 0, -- best single game
   best_level INTEGER NOT NULL DEFAULT 0, -- highest level reached
   icon       TEXT,                       -- icon id shown next to the name
+  rank       INTEGER NOT NULL DEFAULT 1, -- player rank shown on the row
   updated_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS scores_score ON scores(best_score DESC);

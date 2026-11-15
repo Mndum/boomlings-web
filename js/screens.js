@@ -186,12 +186,13 @@ export class ExtrasPanel extends SlidePanel {
     // (the rim has a gap under the active tab).
     const tabs = [['ach', 'topTab', 80], ['global', 'globalTab', 176], ['friends', 'friendsTab', 176], ['local', 'localTab', 176]];
     const place = []; { let t = 16; for (const [k, n, w] of tabs) { place.push({ k, n, w, x: t }); t += w; } }
-    const drawTab = (e, dx) => { const on = this.tab === e.k; this.sprite(ctx, ui, e.n + (on ? '_on' : '') + '_001.png', e.x + e.w / 2 + dx, 193.6, 1, () => { this.tab = e.k; this.scroll.off = 0; }); };
+    const drawTab = (e, dx) => { const on = this.tab === e.k; this.sprite(ctx, ui, e.n + (on ? '_on' : '') + '_001.png', e.x + e.w / 2 + dx, 193.6, 1, () => { this.tab = e.k; this.scroll.off = 0; this.lb = undefined; }); };
     place.forEach((e, ti) => drawTab(e, [2.67, 0.67, -1, -2.67][ti])); // every tab, selected or not, sits behind the list
     const act = place.find((e) => e.k === this.tab);
     brownList(ctx, sc.x, sc.y, sc.w, sc.h, 0, 0, 6.5, 7.3);
     sc.begin(ctx);
     if (this.tab === 'local') this.drawLocal(ctx, sc);
+    else if (this.tab === 'global' && this.G.api && this.G.api.online) this.drawOnline(ctx, sc);
     else if (this.tab === 'global' || this.tab === 'ach') this.drawSpinner(ctx, sc);
     else if (this.tab === 'friends') this.drawFriends(ctx, sc);
     else this.drawSpinner(ctx, sc);
@@ -226,6 +227,17 @@ export class ExtrasPanel extends SlidePanel {
     this.rowHit(bx - 116, by - 40, 232, 80, () => this.app.dialog('Offline', 'Facebook is not available in the offline version of the game.', [['OK', null]]));
     ctx.restore();
     sc.contentH = sc.h;
+  }
+  // global tab, when the backend is there: the Worker's leaderboard (level first, then score)
+  drawOnline(ctx, sc) {
+    const api = this.G.api;
+    if (this.lb === undefined || this.lbTab !== this.tab) { this.lbTab = this.tab; this.lb = null; api.leaderboard().then((j) => { this.lb = j; }).catch(() => { this.lb = false; }); }
+    if (this.lb === null) return this.drawSpinner(ctx, sc);
+    if (this.lb === false) { this.f.gold.draw(ctx, 'COULD NOT LOAD', sc.w / 2, 300, { scale: 0.62 }); sc.contentH = sc.h; return; }
+    const list = this.lb.entries, me = api.user && api.user.name;
+    if (!list.length) this.f.gold.draw(ctx, 'NO SCORES YET', sc.w / 2, 300, { scale: 0.62 });
+    list.forEach((e, i) => highscoreRow(this, ctx, { ...e, icon: e.icon || 'kIcon_001' }, i, 4 + i * 80, sc.w, i % 2 ? 0.14 : 0.0, !!me && e.name === me));
+    sc.contentH = Math.max(sc.h, 4 + list.length * 80);
   }
   drawLocal(ctx, sc) {
     const list = this.G.save.d.scores;
@@ -380,7 +392,13 @@ export class ShopScreen extends Screen {
       const own = save.hasIcon(ic.id), a2 = ic.unlockedBy && this.G.ach.byId[ic.unlockedBy];
       out.push({ kind: 'icon', id: ic.id, boom: ic.index, title: ic.title, desc: ic.desc.split(nl).join(' '), price: ic.price, owned: own, selected: d.icon === ic.id, locked: !own && ic.unlockedBy ? 'Unlocked by <cy>' + (a2 ? a2.title : 'achievement') + '</c>' : null, buy: () => this.buy(ic.title, ic.price, () => store.buyIcon(ic)) });
     }
+    else if (this.tab === 'iap' && this.G.api && this.G.api.online && this.G.api.packs) Object.entries(this.G.api.packs).forEach(([pack, gold], i) => out.push({ kind: 'iap', title: fmt(gold) + ' Gold', desc: 'A pile of <cy>Gold Coins</c> for the Store. Completely <cg>free</c> on this server!', art: 'IAPGold0' + (i + 1) + '_001.png', price: 0, owned: false, buy: () => this.getPack(pack, gold) }));
     return out;
+  }
+  getPack(pack, gold) {
+    const api = this.G.api;
+    if (!api.signedIn) { this.app.account(); return; }
+    api.buyPack(pack).then((g) => this.app.dialog('Gold Reward!', 'You have been rewarded <cg>' + fmt(g) + '</c> <cy>Gold Coins</c>!', [['OK', null]])).catch((e) => this.app.dialog('Error', e.message, [['OK', null]]));
   }
   setTab(t) {
     if (t === 'exit') { if (this.closeT === undefined) this.closeT = 0; return; }
@@ -423,7 +441,7 @@ export class ShopScreen extends Screen {
     for (let i = Math.floor(this.pos) - 1; i <= Math.ceil(this.pos) + 1; i++) { if (!wrap && (i < 0 || i > n - 1)) continue; this.drawItem(ctx, pick(i), (i - this.pos) * SP, i === pg); }
     // header: title banner (left) and gold counter (right)
     menu.draw(ctx, 'shopTabBG_001.png', 168.7, -1.7);
-    if (this.tab === 'iap') { const bf = this.G.fonts.big; bf.draw(ctx, 'IAP', 168.7, -6.7 + 6, { scale: 80 / bf.measure('IAP', 1) }); this.f.gold.draw(ctx, 'Billing not supported', 320, 480.7, { scale: 440 / this.f.gold.measure('Billing not supported', 1) }); }
+    if (this.tab === 'iap') { const bf = this.G.fonts.big; bf.draw(ctx, 'IAP', 168.7, -6.7 + 6, { scale: 80 / bf.measure('IAP', 1) }); if (!n) this.f.gold.draw(ctx, 'Billing not supported', 320, 480.7, { scale: 440 / this.f.gold.measure('Billing not supported', 1) }); }
     else menu.draw(ctx, { items: 'tabLabelItems_001.png', pow: 'tabLabelPow_001.png', icons: 'tabLabelIcons_001.png' }[this.tab], 168.7, -6.7);
     menu.draw(ctx, 'goldBg_001.png', 505, -4);
     const g = String(save.gold | 0); this.f.gold.draw(ctx, g, 575, 1.67, { align: 'right', scale: 0.8 }); this.coin(ctx, 596, -7, 49);
@@ -448,16 +466,18 @@ export class ShopScreen extends Screen {
     if (e.kind === 'pow') {
       for (let q = 0; q < e.rankIcons.length; q++) { const off = e.rankIcons[q].replace('.png', '_off.png'); ic(ui.has(off) ? off : e.rankIcons[q], X(111 + q * 64.5), 171, 62, 1); }
       ic(e.icon, X(320), 267.7, 146, 1);
-    } else if (e.kind === 'slot') menu.draw(ctx, 'slotBG' + e.n + '_001.png', X(320), 269, { scale: 1.2 });
+    } else if (e.kind === 'iap') menu.draw(ctx, e.art, X(320), 271, { scale: 1.0 });
+    else if (e.kind === 'slot') menu.draw(ctx, 'slotBG' + e.n + '_001.png', X(320), 269, { scale: 1.2 });
     else if (e.kind === 'icon') this.G.icons.draw(ctx, iconFrame(e.boom), X(320), 271, { scale: 1.0, alpha: 1 });
     else { ic(e.icon, X(320), 269, 139); if (e.count) f.gold.draw(ctx, 'x' + e.count, X(357), 233, { scale: 0.8 }); }
     if (e.kind === 'item') f.gold.draw(ctx, String(e.have), X(89.3), 179, { align: 'left', scale: 0.99 });
-    if (e.kind !== 'slot' && !e.owned && e.kind !== 'item') ui.draw(ctx, 'lock_icon_001.png', X(349), 243, { scale: 0.75 });
+    if (e.kind !== 'slot' && !e.owned && e.kind !== 'item' && e.kind !== 'iap') ui.draw(ctx, 'lock_icon_001.png', X(349), 243, { scale: 0.75 });
     // ShopItemLayer::updateItemButton shows the Free Gold gem only while the player cannot afford the price (the button then reads "Buy Gold");
     // ShopItemLayer::onFreeGold -> showTapJoyOffers, which the offline build turns into Offline.claim("offers", 10 min) -> awardGold(25)
     if (e.kind !== 'icon' && !e.owned && e.price > this.G.save.gold) { const fg = ui.has('freeBtn_001.png') ? 'freeBtn_001.png' : null; if (fg) { ui.draw(ctx, fg, X(500), 189); if (hit) this.hits.add(440, 130, 120, 110, () => { if (this.G.store.claimOffline('offers', 600000)) this.G.save.addGold(25); else this.app.dialog('Unavailable', 'No offers right now. Check back in 10 minutes!', [['OK', null]]); }); } }
     // price / state + button
     if (e.kind === 'icon' && e.owned) this.btnLabel(ctx, e.selected ? 'Selected' : 'Select', X(320), 413, e.selected ? 213 : 187, hit && !e.selected ? () => { this.G.save.d.icon = e.id; this.G.save.flush(); } : null, e.selected);
+    else if (e.kind === 'iap') { f.gold.draw(ctx, 'FREE', 320, 362, { scale: 0.95 }); this.btnLabel(ctx, this.G.api.signedIn ? 'Get Gold' : 'Sign in', X(320), 418.4, 213, hit ? () => e.buy() : null); }
     else if (e.owned) this.btnLabel(ctx, e.kind === 'pow' ? 'Maxed' : 'Owned', X(320), 413, 187, null, true);
     else if (e.locked) richText(ctx, f.chat, e.locked, X(320), 395, { scale: 1.0, maxWidth: 420, align: 'center', lineHeight: 40 });
     else {

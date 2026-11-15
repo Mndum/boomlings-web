@@ -782,6 +782,7 @@ export class PlayScene {
     if (newBest) { d.best = this.score; d.loose = 0; } else { d.loose++; if (d.loose >= 3) this.ach.report('boomlings.ach.yuno'); }
     const entry = { name: d.name, score: this.score, level: this.level, icon: d.icon, rank: d.rank, date: Date.now() };
     const lbIndex = this.score > 0 ? sv.addScore(entry) : -1;
+    if (this.score > 0 && this.G.api) this.G.api.submitScore(entry);
     sv.inc('games'); sv.inc('timePlayed', Math.floor(this.playTime)); sv.setMax('bestLevel', this.level);
     sv.flush();
     this.summary = { gold, base, score: this.score, level: this.level, moves: this.moves, xpGain: this.xp, rankBefore, rankAfter: d.rank, xpBefore, xpNow: d.xp, newBest, lbIndex, reason: this.overReason, prevBest };
