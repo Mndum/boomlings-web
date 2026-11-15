@@ -52,14 +52,14 @@ export class Screen {
     ctx.restore();
     if (fn && !o.disabled) this.hits.add(cx - w / 2, cy - h / 2, w, h, fn);
   }
-  // CCMenuItemSpriteExtra: pressed items scale to 1.26 and released ones back to 1.0, both with a 0.3s CCEaseBounceOut
+  // CCMenuItemSpriteExtra (traced on the real game): pressing runs CCEaseBounceOut(CCScaleTo 0.3s -> 1.26), releasing CCEaseBounceOut(CCScaleTo 0.4s -> 1.0)
   pscale(x, y, w, h) {
     const a = this.pa && this.pa[hkey(x, y, w, h)]; if (!a) return 1;
-    return a.from + (a.to - a.from) * bounceOut(Math.min(1, (performance.now() - a.t0) / 300));
+    return a.from + (a.to - a.from) * bounceOut(Math.min(1, (performance.now() - a.t0) / a.dur));
   }
   // draw fn() scaled around (cx, cy) by the press animation of the hit rect (x, y, w, h)
   pressed(ctx, x, y, w, h, cx, cy, fn) { const k = this.pscale(x, y, w, h); ctx.save(); ctx.translate(cx, cy); ctx.scale(k, k); ctx.translate(-cx, -cy); fn(); ctx.restore(); }
-  pressTo(key, to) { this.pa = this.pa || {}; const a = this.pa[key], cur = a ? a.from + (a.to - a.from) * bounceOut(Math.min(1, (performance.now() - a.t0) / 300)) : 1; this.pa[key] = { from: cur, to, t0: performance.now() }; }
+  pressTo(key, to) { this.pa = this.pa || {}; const a = this.pa[key], cur = a ? a.from + (a.to - a.from) * bounceOut(Math.min(1, (performance.now() - a.t0) / a.dur)) : 1; this.pa[key] = { from: cur, to, t0: performance.now(), dur: to > 1 ? 300 : 400 }; }
   down(x, y) { this.pd = this.hits.hit(x, y); if (this.pd && this.pd.fn && this.pd.press !== false) { this.pk = hkey(this.pd.x, this.pd.y, this.pd.w, this.pd.h); this.pressTo(this.pk, 1.26); } if (this.scroll) this.scroll.down(x, y); }
   move(x, y) { if (this.scroll) this.scroll.move(x, y); }
   up(x, y) {
@@ -362,7 +362,8 @@ export class PowerSelectScreen extends Screen {
 }
 
 // ---------------------------------------------------------------- store (GameShopLayer): one item per page, tabs along the bottom
-const SHOP_DROP_T = 0.85, SHOP_CLOSE_T = 0.68, SHOP_CLOSE_POP = 0.55;
+// traced on the real game: GameShopLayer drops in with CCEaseBounceOut(CCMoveTo 1.0s) and leaves with CCEaseInOut(CCMoveTo 0.7s, rate 2)
+const SHOP_DROP_T = 1.0, SHOP_CLOSE_T = 0.7, SHOP_CLOSE_POP = 0.7;
 export class ShopScreen extends Screen {
   constructor(app, tab = 'pow') { super(app); this.tab = tab; this.page = {}; this.drag = null; this.pos = 0; this.dropT = 0; }
   items() {
@@ -396,7 +397,7 @@ export class ShopScreen extends Screen {
     if (!this.anim && Math.abs(this.pos - tgt) > 1e-4) this.anim = { from: this.pos, to: tgt, t: 0, dur: 1.2 * (this.flick ?? 0.8) };
     if (this.anim && this.anim.to !== tgt) this.anim = { from: this.pos, to: tgt, t: 0, dur: 1.2 * (this.flick ?? 0.8) };
     if (this.anim) {
-      const a = this.anim; a.t += dt; const u = Math.min(1, a.t / a.dur), pp = 0.3;
+      const a = this.anim; a.t += dt; const u = Math.min(1, a.t / a.dur), pp = 0.5;   // CCEaseElasticOut(period 0.5) as traced
       const e = u <= 0 ? 0 : u >= 1 ? 1 : Math.pow(2, -10 * u) * Math.sin((u - pp / 4) * (2 * Math.PI) / pp) + 1;
       this.pos = a.from + (a.to - a.from) * e;
       if (u >= 1) { this.pos = a.to; this.anim = null; this.flick = null; }
