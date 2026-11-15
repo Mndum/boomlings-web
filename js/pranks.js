@@ -59,7 +59,11 @@ export class Pranks {
       case 'bombrain': this.emojiRain(secs, 'bomb'); return;
       case 'iconrain': this.emojiRain(secs, 'icon'); return;
       case 'silence': { const au = this.G.audio, was = au.enabled, mv = au.mv; au.enabled = false; au.setMusicVol(0); setTimeout(() => { au.enabled = was; au.setMusicVol(mv); }, secs * 1000); return; }
-      case 'blackout': this.overlay('<div style="font-size:64px">&#128064;</div>', Math.min(secs, 8), '#000', false); return;
+      case 'blackout': {   // black screen, two pairs of eyes (the animated eye) blink open one after another
+        const o = this.overlay('', Math.min(secs, 8), '#000', false), at = [[2, 12, 34, 0], [48, 14, 34, 1], [10, 52, 44, 0], [46, 54, 44, 1]];   // left %, top %, width %, mirrored
+        at.forEach(([l, t, w, m], i) => setTimeout(() => { if (!o.isConnected) return; const im = document.createElement('img'); im.src = 'assets/blackout-eye.gif?' + i; im.draggable = false; im.style.cssText = 'position:absolute;left:' + l + '%;top:' + t + '%;width:' + w + '%;mix-blend-mode:lighten;pointer-events:none' + (m ? ';transform:scaleX(-1)' : ''); o.appendChild(im); }, i * 450));
+        return;
+      }
       case 'jumpscare': {
         const o = this.G.obj, nm = 'MegaBomb_r_001.png', c = document.createElement('canvas'); c.width = c.height = 420;
         if (o && o.has(nm)) o.draw(c.getContext('2d'), nm, 210, 210, { scale: 400 / Math.max(...o.size(nm)) });
@@ -129,6 +133,7 @@ export class Pranks {
     const end = () => { if (d.parentNode) { d.remove(); this.app.toast('Just kidding :)', 'Nothing is wrong', 'getAch001.ogg'); } };
     if (closable) d.querySelectorAll('[data-x]').forEach((b) => b.addEventListener('click', end));
     setTimeout(end, secs * 1000);
+    return d;
   }
   // sprites falling over the game on a pointer-transparent layer for `secs` seconds: Boomling blobs, bombs or the player icons
   emojiRain(secs, kind = 'blob') {
