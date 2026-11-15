@@ -2,30 +2,32 @@
 // One Cloudflare Worker + one D1 database. The game's static files are served by the [assets] binding; only /api/* gets here.
 // This is our own small JSON API (not the original game's server protocol).
 
+import { adminHandler } from './admin.js';
+
 const enc = new TextEncoder();
-const J = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
-const bad = (msg, s = 400) => J({ error: msg }, s);
+export const J = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
+export const bad = (msg, s = 400) => J({ error: msg }, s);
 
-const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
+export const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
 const unb64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
-const hex = (buf) => [...new Uint8Array(buf)].map((x) => x.toString(16).padStart(2, '0')).join('');
-const sha256 = async (s) => hex(await crypto.subtle.digest('SHA-256', enc.encode(s)));
+export const hex = (buf) => [...new Uint8Array(buf)].map((x) => x.toString(16).padStart(2, '0')).join('');
+export const sha256 = async (s) => hex(await crypto.subtle.digest('SHA-256', enc.encode(s)));
 
-async function hashPw(pw, salt) {
+export async function hashPw(pw, salt) {
   const key = await crypto.subtle.importKey('raw', enc.encode(pw), 'PBKDF2', false, ['deriveBits']);
   return b64(await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: 100000 }, key, 256)); // 100k is the Workers maximum
 }
-const eq = (a, b) => { if (a.length !== b.length) return false; let r = 0; for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i); return r === 0; };
+export const eq = (a, b) => { if (a.length !== b.length) return false; let r = 0; for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i); return r === 0; };
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I
 const newRefCode = () => { const r = crypto.getRandomValues(new Uint8Array(8)); return [...r].map((x) => CODE_ALPHABET[x % 32]).join(''); };
-const NAME_RE = /^[A-Za-z0-9 _-]{3,12}$/;
-const now = () => Math.floor(Date.now() / 1000);
+export const NAME_RE = /^[A-Za-z0-9 _-]{3,12}$/;
+export const now = () => Math.floor(Date.now() / 1000);
 
 // Free "in-app purchases": every pack is granted for nothing (the packs themselves are our own choice; the store data has none)
 const IAP_PACKS = { gold_1: 500, gold_2: 1200, gold_3: 3000, gold_4: 7500, gold_5: 20000 }; // art: IAPGold01..05
 
-async function body(req, max = 300000) {
+export async function body(req, max = 300000) {
   const t = await req.text();
   if (t.length > max) throw new Error('too large');
   return t ? JSON.parse(t) : {};
@@ -35,7 +37,7 @@ async function auth(req, env) {
   const h = req.headers.get('authorization') || '';
   const tok = h.startsWith('Bearer ') ? h.slice(7) : '';
   if (!tok) return null;
-  return env.DB.prepare('SELECT u.* FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ?').bind(await sha256(tok), now()).first();
+  return env.DB.prepare('SELECT u.* FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ? AND u.banned = 0').bind(await sha256(tok), now()).first();
 }
 
 async function newSession(env, userId) {
@@ -83,6 +85,7 @@ const routes = {
     // same work whether or not the account exists, so response time does not reveal names
     const h = await hashPw(password, u ? unb64(u.pw_salt) : new Uint8Array(16));
     if (!u || !eq(h, u.pw_hash)) return bad('Wrong name or password', 401);
+    if (u.banned) return bad('This account is banned' + (u.ban_reason ? ': ' + u.ban_reason : ''), 403);
     return J({ token: await newSession(env, u.id), user: profile(u) });
   },
 
@@ -125,11 +128,11 @@ const routes = {
   // ordered like the game's own local list: highest level first, then score
   async 'GET /api/leaderboard'(req, env, u) {
     const limit = Math.min(100, Math.max(1, +new URL(req.url).searchParams.get('limit') || 50));
-    const rows = await env.DB.prepare('SELECT u.name AS name, s.best_score AS score, s.best_level AS level, s.icon AS icon, s.rank AS rank FROM scores s JOIN users u ON u.id = s.user_id WHERE s.best_score > 0 ORDER BY s.best_level DESC, s.best_score DESC, s.updated_at ASC LIMIT ?').bind(limit).all();
+    const rows = await env.DB.prepare('SELECT u.name AS name, s.best_score AS score, s.best_level AS level, s.icon AS icon, s.rank AS rank FROM scores s JOIN users u ON u.id = s.user_id WHERE s.best_score > 0 AND u.banned = 0 ORDER BY s.best_level DESC, s.best_score DESC, s.updated_at ASC LIMIT ?').bind(limit).all();
     let me = null;
     if (u) {
       const s = await env.DB.prepare('SELECT best_score score, best_level level FROM scores WHERE user_id = ?').bind(u.id).first();
-      if (s && s.score > 0) me = { ...s, rank: 1 + (await env.DB.prepare('SELECT COUNT(*) n FROM scores WHERE best_level > ?1 OR (best_level = ?1 AND best_score > ?2)').bind(s.level, s.score).first()).n };
+      if (s && s.score > 0) me = { ...s, rank: 1 + (await env.DB.prepare('SELECT COUNT(*) n FROM scores s JOIN users x ON x.id = s.user_id WHERE x.banned = 0 AND (s.best_level > ?1 OR (s.best_level = ?1 AND s.best_score > ?2))').bind(s.level, s.score).first()).n };
     }
     return J({ entries: rows.results, me });
   },
@@ -181,6 +184,7 @@ async function redeem(env, userId, codeRaw) {
 export default {
   async fetch(req, env) {
     const url = new URL(req.url), key = req.method + ' ' + url.pathname;
+    if (url.pathname.startsWith('/api/admin/')) return adminHandler(req, env, url);
     const fn = routes[key];
     if (!fn) return bad('Not found', 404);
     try {

@@ -29,3 +29,9 @@ To keep it private, add a Cloudflare Access policy (Zero Trust, free up to 50 us
 | `GET /api/iap`, `POST /api/iap {pack}` | free gold packs |
 
 Scores come from the client, so they cannot be verified. Add a Cloudflare rate-limiting rule on `/api/*` if the server is ever public.
+
+## Admin site
+
+Open /admin/ on the deployed site and sign in. Credentials are stored hashed in the `admin_creds` table (never in the repo); sessions last 12 hours and 5 wrong guesses lock an IP out for 15 minutes. Local testing (
+ode server/dev.mjs): user `dev`, password `dev-password`.
+

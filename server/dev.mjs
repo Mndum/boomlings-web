@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
-import worker from './worker.js';
+import worker, { hashPw, b64 } from './worker.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const port = +process.argv[2] || 8787;
@@ -20,6 +20,10 @@ class Stmt {
   async first() { return this._s().get(...this.args) || null; }
   async all() { return { results: this._s().all(...this.args) }; }
   async run() { const r = this._s().run(...this.args); return { meta: { changes: Number(r.changes), last_row_id: Number(r.lastInsertRowid) } }; }
+}
+{ // local testing only: user "dev", password "dev-password"
+  const salt = new Uint8Array(16); sqlite.prepare('DELETE FROM admin_creds').run();
+  sqlite.prepare('INSERT INTO admin_creds (user_lc, pw_hash, pw_salt) VALUES (?, ?, ?)').run('dev', await hashPw('dev-password', salt), b64(salt));
 }
 const DB = { prepare: (sql) => new Stmt(sql), batch: (list) => Promise.all(list.map((s) => s.run())) };
 const env = { DB, REF_REWARD_NEW: '100', REF_REWARD_OWNER: '100', REF_MAX_PER_OWNER: '50' };

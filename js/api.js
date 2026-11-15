@@ -19,7 +19,7 @@ export class Api {
   // is there a backend at all? who am I?
   async init() {
     try { this.packs = (await this.req('GET', 'api/iap')).packs; this.online = true; } catch (e) { this.online = false; return; }
-    if (this.token) { try { this.user = (await this.req('GET', 'api/me')).user; } catch (e) { if (e.status === 401) this.setToken(''); } }
+    if (this.token) { try { this.user = (await this.req('GET', 'api/me')).user; this.claim().catch(() => {}); } catch (e) { if (e.status === 401) this.setToken(''); } }   // claim: gold gifted while away
   }
   setToken(t) { this.token = t; try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch (e) { /* ignore */ } if (!t) this.user = null; }
   async register(name, password, ref) { const j = await this.req('POST', 'api/register', { name, password, ref: ref || undefined }); this.setToken(j.token); this.user = j.user; return j; }

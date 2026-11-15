@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS users (
   referred_by INTEGER REFERENCES users(id),
   earned_gold  INTEGER NOT NULL DEFAULT 0,  -- gold earned from referrals so far
   claimed_gold INTEGER NOT NULL DEFAULT 0,  -- part of it already handed to the client
+  banned      INTEGER NOT NULL DEFAULT 0,
+  ban_reason  TEXT,
   created_at  INTEGER NOT NULL
 );
 
@@ -34,3 +36,29 @@ CREATE TABLE IF NOT EXISTS scores (
   updated_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS scores_rank ON scores(best_level DESC, best_score DESC);
+
+-- moderation actions taken from the admin site
+CREATE TABLE IF NOT EXISTS admin_log (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  at          INTEGER NOT NULL,
+  action      TEXT    NOT NULL,
+  target_id   INTEGER,
+  target_name TEXT,
+  detail      TEXT
+);
+
+-- admin site sign-in: credentials are stored hashed, sessions expire, wrong guesses are rate limited per IP
+CREATE TABLE IF NOT EXISTS admin_creds (
+  user_lc TEXT PRIMARY KEY,
+  pw_hash TEXT NOT NULL,
+  pw_salt TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS admin_sessions (
+  token_hash TEXT PRIMARY KEY,
+  expires_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS admin_attempts (
+  ip TEXT NOT NULL,
+  at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS admin_attempts_ip ON admin_attempts(ip, at);
