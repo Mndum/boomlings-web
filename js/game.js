@@ -170,7 +170,8 @@ export class PlayScene {
     this.pieces.push(p);
     if (enter) {
       p.scale = 0.1; p.alpha = 0;
-      this.tween(p, { scale: 1, alpha: 1 }, 0.3);
+      this.tween(p, { scale: 1 }, 0.3, easeIO2);   // CCScaleTo 0.3 + CCEaseInOut(2), as traced
+      this.tween(p, { alpha: 1 }, 0.15);                                                              // CCFadeIn 0.15
       if (p.attr === ATTR.Pipe) p.anim.play('EnterAnim', false, () => p.anim.play('Idle01', true));
       this.introTut(p.attr);
       if (p.attr === ATTR.Skull) this.sfx(SFX.skullEnter, 0.7);
