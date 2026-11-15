@@ -118,7 +118,7 @@ export class MenuScreen extends Screen {
     );
     menu.draw(ctx, 'feedback_001.png', 176, 873.333);
     const mg = this.G.img.more; ctx.drawImage(mg, 560 - mg.width / 2, 853.333 - mg.height / 2);
-    this.hits.add(560 - mg.width / 2, 853.333 - mg.height / 2, mg.width, mg.height, () => this.app.dialog('More Games', 'More games from RobTop need an internet connection.', [['OK', null]]));
+    this.hits.add(560 - mg.width / 2, 853.333 - mg.height / 2, mg.width, mg.height, () => { try { window.open('https://www.geometrydash.com/games/', '_blank', 'noopener'); } catch (e) { /* popup blocked */ } });
     // the rate label slides 5 points right and back forever: CCRepeatForever(CCSequence(CCEaseInOut(CCMoveBy(1s, (5,0)), 2), its reverse)), starting from rateBtn.x - 54 = 236 (MenuLayer::init)
     { const ph = this.t % 2, u = ph < 1 ? ph : 2 - ph; menu.draw(ctx, 'rate_001.png', 2 * (236 + 5 * ease(u)), 953.333); }
     // MenuLayer::onRate -> AppDelegate::openAppPage; the offline build's page-opener does nothing visible, so the button only presses
