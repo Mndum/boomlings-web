@@ -5,6 +5,15 @@ import { W, H, CH, OY, ScrollArea, roundRect, richText } from './ui.js';
 import { Screen, SlidePanel, btnBG, brownList, easeIO, SLIDE_T } from './screens.js';
 import { TITLES } from './rules.js';
 
+// phones: put the game on the home screen (full screen, no browser bars). Chrome gives us a real install prompt; iPhones and other browsers get the steps
+const installed = () => matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches || navigator.standalone === true;
+const installable = () => matchMedia('(pointer: coarse)').matches && !installed();
+function installApp(app) {
+  const ev = window.__installEv;
+  if (ev) { window.__installEv = null; ev.prompt(); return; }
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+  app.dialog('Install Boomlings', ios ? 'Tap the <cy>Share</c> button in Safari, then choose <cg>Add to Home Screen</c>.' : 'Open the browser <cy>menu</c> and choose <cg>Install app</c> or <cg>Add to Home screen</c>.', [['OK', null]]);
+}
 const pad2 = (n) => String(Math.floor(n)).padStart(2, '0');
 const clock = (s) => pad2(s / 3600) + ':' + pad2((s / 60) % 60) + ':' + pad2(s % 60);
 
@@ -111,7 +120,7 @@ export class AchPanel extends ListPanel {
 
 // what changed in each update, newest first (Options > Changelog): brown list, gold version titles, chat-font lines
 const CHANGELOG = [
-  ['Update 8: Music and Changelog', ['Music now starts the moment the game loads', 'Sound mutes when you leave or switch apps on a phone', 'Full-quality danger music', 'This changelog opens by itself after each update (also Options > Changelog)']],
+  ['Update 8: Music and Changelog', ['Music now starts the moment the game loads', 'Sound mutes when you leave or switch apps on a phone', 'Full-quality danger music', 'This changelog opens by itself after each update (also Options > Changelog)', 'Press M to mute, F for fullscreen', 'Typing a name with a P no longer closes the box', 'Desktop: a run pauses when you click another window', 'Phones: the screen stays awake while you play', 'Phones: Options > Install App puts the game on your home screen']],
   ['Update 7: Real particles', ['Menu sparkles and all effects now follow the real game engine', 'New update pop-up: refresh to get the latest version', 'In-game text box that never resizes the screen']],
   ['Update 6: Phones', ['Works on iPhone and Android', 'Haptics on Android (Options)', 'Game centred with black borders on phones', 'Music no longer shows in the media player']],
   ['Update 5: Friends', ['Connect your Discord account', 'Friends tab shows players from your servers', 'Trophy tab shows the top 50 players', 'Share dialog buttons animate']],
@@ -144,13 +153,14 @@ export class OptionsPanel extends SlidePanel {
     this.drawFrame(ctx);
     const { save, ui } = this.G, f = this.f, d = save.d;
     { const g = ctx.createLinearGradient(0, 160, 0, 900); g.addColorStop(0, '#00304c'); g.addColorStop(0.35, '#003750'); g.addColorStop(1, '#001f31'); ctx.fillStyle = g; roundRect(ctx, 60, 158.7, 520, 740, 16); ctx.fill(); }
-    this.button(ctx, 'Reset Tutorial', 320, 250, 216, 33, () => this.app.dialog('Reset Tutorial', 'Do you want to <cg>reset</c> the <cy>Tutorial</c>? All guides and hints will be reset.', [['Cancel', null], ['Yes', () => { d.tut = {}; save.flush(); }]]), { scale: 1 });
-    this.button(ctx, 'Changelog', 320, 322, 216, 33, () => this.app.go(new ChangelogPanel(this.app)), { scale: 1 });
-    this.button(ctx, 'Support', 320, 394, 216, 33, () => this.app.netError(), { scale: 1 });
-    this.pressed(ctx, 204, 466, 232, 80, 320, 506, () => (this.G.api && this.G.api.discordOn ? discordBtn(ctx, this.G, 320, 506) : ui.draw(ctx, 'fbLogInBtn_001.png', 320, 506))); this.hits.add(204, 466, 232, 80, () => (this.G.api && this.G.api.discordOn ? this.app.discord() : this.app.account()));
+    this.button(ctx, 'Reset Tutorial', 320, 232, 216, 33, () => this.app.dialog('Reset Tutorial', 'Do you want to <cg>reset</c> the <cy>Tutorial</c>? All guides and hints will be reset.', [['Cancel', null], ['Yes', () => { d.tut = {}; save.flush(); }]]), { scale: 1 });
+    this.button(ctx, 'Changelog', 320, 296, 216, 33, () => this.app.go(new ChangelogPanel(this.app)), { scale: 1 });
+    if (installable()) this.button(ctx, 'Install App', 320, 424, 216, 33, () => installApp(this.app), { scale: 1 });   // phones/tablets running in the browser
+    this.button(ctx, 'Support', 320, 360, 216, 33, () => this.app.netError(), { scale: 1 });
+    this.pressed(ctx, 204, 468, 232, 80, 320, 508, () => (this.G.api && this.G.api.discordOn ? discordBtn(ctx, this.G, 320, 508) : ui.draw(ctx, 'fbLogInBtn_001.png', 320, 508))); this.hits.add(204, 468, 232, 80, () => (this.G.api && this.G.api.discordOn ? this.app.discord() : this.app.account()));
     if (navigator.vibrate) {   // phones that can vibrate (Android): switch the haptics on or off
       const on = d.opts.haptics !== false;
-      this.button(ctx, 'Haptics: ' + (on ? 'On' : 'Off'), 320, 574, 216, 33, () => { d.opts.haptics = !on; this.G.audio.haptics = !on; save.flush(); if (!on) { try { navigator.vibrate(40); } catch (e) { /* ignore */ } } }, { scale: 1 });
+      this.button(ctx, 'Haptics: ' + (on ? 'On' : 'Off'), 320, 596, 216, 33, () => { d.opts.haptics = !on; this.G.audio.haptics = !on; save.flush(); if (!on) { try { navigator.vibrate(40); } catch (e) { /* ignore */ } } }, { scale: 1 });
     }
     [['Music', d.opts.mv ?? 1], ['Effects', d.opts.sv ?? 1]].forEach(([lab, v], i) => {
       const g = this.geom(i), gr = this.G.img.groove, bar = this.G.img.sliderbar, tx = g.x + (g.w - 13) * v;

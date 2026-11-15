@@ -46,7 +46,7 @@ export class AudioMan {
   }
   play(name, vol = 1) {
     this.buzz(name);
-    if (!this.enabled || !this.unlocked || this.away) return;
+    if (!this.enabled || !this.unlocked || this.away || this.muted) return;
     const ac = this.ctx(); if (!ac || ac.state !== 'running') return;   // not allowed to make sound yet: do not queue clicks that would all burst out later
     this.load(name).then((b) => {
       if (!b) return;
@@ -61,11 +61,13 @@ export class AudioMan {
     const token = (this.token = (this.token || 0) + 1);
     this.load(name).then((b) => {
       if (!b || token !== this.token || this.musicName !== name) return;   // stopped or replaced while it was loading
-      const s = ac.createBufferSource(), g = ac.createGain(); s.buffer = b; s.loop = true; g.gain.value = Math.min(1, vol * this.mv); s.connect(g); g.connect(ac.destination); s.start(0);
+      const s = ac.createBufferSource(), g = ac.createGain(); s.buffer = b; s.loop = true; g.gain.value = this.muted ? 0 : Math.min(1, vol * this.mv); s.connect(g); g.connect(ac.destination); s.start(0);
       this.music = { s, g, baseVol: vol };
     });
   }
-  setMusicVol(v) { this.mv = v; if (this.music) this.music.g.gain.value = Math.min(1, (this.music.baseVol || 0.5) * v); }
+  setMusicVol(v) { this.mv = v; if (this.music) this.music.g.gain.value = this.muted ? 0 : Math.min(1, (this.music.baseVol || 0.5) * v); }
+  // quick mute for everything (the M key); the volume sliders and saved options are untouched
+  setMuted(on) { this.muted = !!on; this.setMusicVol(this.mv); }
   stopMusic() {
     this.token = (this.token || 0) + 1;
     if (this.music) { try { this.music.s.stop(); this.music.s.disconnect(); } catch (e) { /* ignore */ } this.music = null; }

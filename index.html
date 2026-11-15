@@ -34,6 +34,8 @@
   // no right-click menu (so "Save image as…" is not offered on the game) and no dragging the canvas out
   addEventListener('contextmenu', function (e) { e.preventDefault(); });
   addEventListener('dragstart', function (e) { e.preventDefault(); });
+  // keep Chrome's install prompt for the Options > Install App button
+  addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); window.__installEv = e; });
 </script>
 <script type="module" src="js/main.js"></script>
 </body>

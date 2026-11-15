@@ -309,9 +309,18 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) leave
 addEventListener('pagehide', () => G.audio.suspend()); addEventListener('pageshow', () => G.audio.back());
 if (touchDev && !G.audio.late) { addEventListener('blur', leave); addEventListener('focus', () => { if (!document.hidden) G.audio.back(); }); }
 document.addEventListener('freeze', () => G.audio.suspend());
+if (!touchDev) addEventListener('blur', () => { if (document.activeElement && document.activeElement.tagName === 'IFRAME') return; if (app.top() instanceof PlayScreen) app.pause(); });   // desktop: clicking another window pauses a run
+// phones: keep the screen awake while the game is open (a run is never interrupted by the screen dimming)
+let wake = null;
+const keepAwake = async () => { try { if (touchDev && navigator.wakeLock && !document.hidden && !wake) { wake = await navigator.wakeLock.request('screen'); wake.addEventListener('release', () => { wake = null; }); } } catch (e) { wake = null; } };
+addEventListener('pointerup', keepAwake); document.addEventListener('visibilitychange', () => { if (!document.hidden) keepAwake(); });
 canvas.addEventListener('wheel', (ev) => { ev.preventDefault(); const top = app.top(); if (top && top.wheel) top.wheel(ev.deltaY); }, { passive: false });
 window.addEventListener('keydown', (ev) => {
+  const tg = ev.target, typing = tg && (tg.tagName === 'INPUT' || tg.tagName === 'TEXTAREA' || tg.isContentEditable);
+  if (typing || ev.ctrlKey || ev.metaKey || ev.altKey) return;   // typing a name must never trigger a hotkey (a "p" used to close the box)
   const top = app.top();
+  if (ev.key === 'm' || ev.key === 'M') { G.audio.setMuted(!G.audio.muted); app.toast(G.audio.muted ? 'Sound off' : 'Sound on', 'Press M to switch'); return; }
+  if ((ev.key === 'f' || ev.key === 'F') && document.fullscreenEnabled) { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen().catch(() => {}); return; }
   if (top instanceof TutorialPopup) { top.close(); return; }
   if (ev.key === 'Escape' || ev.key === 'p') { if (top instanceof PlayScreen) app.pause(); else if (top instanceof PauseScreen) app.resume(); else if (top && !(top instanceof MenuScreen) && !(top instanceof ResultsScreen)) app.back(); }
 });
