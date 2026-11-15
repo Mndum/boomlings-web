@@ -137,7 +137,7 @@ export class SlidePanel extends Screen {
   close() { if (!this.closing) { this.closing = true; this.tIn = 0; } }
   k() { return this.closing ? 1 - easeIO(this.tIn / SLIDE_T) : easeIO(this.tIn / SLIDE_T); }
   dimK() { const u = Math.min(1, this.tIn / SLIDE_T); return this.closing ? 1 - u : u; } // CCFadeTo on the layer colour: linear
-  drawFrame(ctx) {
+  drawFrame(ctx, live = false) {
     this.bg(ctx); // the real panel replaces the screen: only the menu backdrop shows around it
     const k = this.k();
     ctx.fillStyle = 'rgba(0,10,40,' + (0.62 * this.dimK()) + ')'; ctx.fillRect(0, -OY, W, CH);
@@ -146,7 +146,8 @@ export class SlidePanel extends Screen {
     this.G.ui.draw(ctx, 'pauseBG_001.png', 320, 16 + 924 / 2 + 19.6);
     this.sprite(ctx, this.G.ui, 'playBtn_001.png', 320, 60, 0.852, () => this.close());
     this.sprite(ctx, this.G.menu, 'backArrow_001.png', 40, -13, 1, () => this.close());
-    this.G.ui.draw(ctx, 'shareBtn_001.png', 560.67, 14, { alpha: 0.5 });
+    if (live) this.sprite(ctx, this.G.ui, 'shareBtn_001.png', 560.67, 14, 1, () => this.app.go(new ShareDialog(this.app, 1)));   // HighscoreLayer share: the "Share Rank" dialog
+    else this.G.ui.draw(ctx, 'shareBtn_001.png', 560.67, 14, { alpha: 0.5 });
   }
   endFrame(ctx) { ctx.restore(); }
 }
@@ -193,7 +194,7 @@ function friendsOnline(s, ctx, sc, cy) {
 export class ExtrasPanel extends SlidePanel {
   constructor(app, tab = 'friends') { super(app); this.tab = tab === 'stats' ? 'global' : tab; this.scroll = new ScrollArea(PX(10) + 6, PY(366), PX(300) - 12, 590); }
   draw(ctx) {
-    this.drawFrame(ctx);
+    this.drawFrame(ctx, true);
     const { ui, menu } = this.G;
     // back arrow (top-left) and Share button (top-right), as in HighscoreLayer
     // brown list area (the real leaderboard background) framed by the dark panel
