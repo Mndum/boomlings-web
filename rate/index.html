@@ -6,92 +6,69 @@
 <title>Rate Boomlings</title>
 <meta name="description" content="Rate this fan-made browser port of Boomlings and leave feedback.">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&family=Lilita+One&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&display=swap">
 <style>
   /* Pusab by Flat-it (freeware) */
   @font-face { font-family:'Pusab'; src:url('pusab.otf') format('opentype'); font-display:swap; }
-  /* same palette as the RobTop site: near-black navy bar, soft blue links, glowing blue edges */
-  :root { --bg:#000c20; --link:#82b7ff; --glow:#00235b; --ground:#001941; --star:#ffc21a; --ink:#fff; --mute:#a9c4ee; --nav-h:64px; }
+  :root { --bg:#0d1b33; --card:#14264a; --line:#243a66; --ink:#eef3fb; --mute:#9db0cf; --star:#f5b301; --brand:#2f7fe6; }
   * { box-sizing:border-box; }
-  html,body { margin:0; min-height:100%; background:var(--bg); }
-  body { color:var(--ink); font:500 16px/1.5 Montserrat,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; display:flex; flex-direction:column; min-height:100vh; }
-  .pu, h1, h2, .big b, .send, .stars button, label, .bar b { font-family:Pusab,'Lilita One','Arial Rounded MT Bold',system-ui,sans-serif; font-weight:400; letter-spacing:.3px; }
+  html,body { margin:0; min-height:100%; }
+  body { background:#1a63bd; color:var(--ink); font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; padding:28px 16px 56px; }
+  .pu, h1, h2, .big b, .send, .stars button, label, .bar b { font-family:'Pusab','Lilita One','Arial Rounded MT Bold',system-ui,sans-serif; font-weight:400; letter-spacing:.3px; }
+  /* checkerboard sliding diagonally, one tile per loop so it never jumps */
+  body::before { content:''; position:fixed; inset:0; z-index:-1; background:conic-gradient(#2a7de1 25%, #1f6bcb 0 50%, #2a7de1 0 75%, #1f6bcb 0) 0 0 / 96px 96px; animation:slide 4s linear infinite; }
+  @keyframes slide { to { background-position:96px 96px; } }
+  @media (prefers-reduced-motion: reduce) { body::before { animation:none; } }
+  main { max-width:520px; margin:0 auto; position:relative; }
+  header { display:flex; align-items:center; gap:14px; margin-bottom:6px; }
+  header { flex-wrap:wrap; }
+  header img { height:56px; width:auto; }
+  h1 { font-size:34px; line-height:1.05; margin:0; color:#fff; -webkit-text-stroke:5px #000; paint-order:stroke fill; text-shadow:0 4px 0 rgba(0,0,0,.35); }
+  .lead { color:#fff; margin:8px 0 20px; font-weight:600; text-shadow:0 2px 0 rgba(0,0,0,.45); }
+  .card { background:#0f2a5c; border:4px solid #000; border-radius:16px; padding:18px; margin-bottom:18px; box-shadow:0 6px 0 rgba(0,0,0,.3); }
+  h2 { font-size:22px; margin:0 0 12px; color:#ffd23f; text-shadow:0 3px 0 #000; }
 
-  /* top bar */
-  .top { height:var(--nav-h); background:var(--bg); border-bottom:3px solid var(--glow); box-shadow:0 2px 16px rgba(30,110,255,.35); display:flex; align-items:center; justify-content:space-between; padding:0 clamp(14px,4vw,40px); position:relative; z-index:5; flex:none; }
-  .top img { height:40px; width:auto; display:block; }
-  .top nav { display:flex; gap:clamp(14px,3vw,30px); }
-  .top nav a { color:var(--link); text-decoration:none; font-weight:600; font-size:15px; }
-  .top nav a:hover, .top nav a.on { color:#fff; }
-
-  /* backdrop: scrolling blue squares, drawn at load (see script) */
-  #bg { position:fixed; inset:var(--nav-h) 0 0 0; z-index:0; background:linear-gradient(#00265f,#0a58c8 70%,#1675ee) ; }
-  #bg i { position:absolute; inset:0; background-repeat:repeat; animation:scroll 70s linear infinite; }
-  @keyframes scroll { to { background-position-x:var(--tile,1024px); } }
-  @media (prefers-reduced-motion: reduce) { #bg i { animation:none; } }
-
-  main { position:relative; z-index:1; width:100%; max-width:600px; margin:0 auto; padding:30px 16px 34px; flex:1 0 auto; }
-  h1 { font-size:clamp(30px,8vw,44px); line-height:1.05; margin:0 0 6px; text-align:center; color:#fff; -webkit-text-stroke:5px #000; paint-order:stroke fill; text-shadow:0 4px 0 rgba(0,0,0,.4); }
-  .lead { text-align:center; color:#e6f0ff; margin:0 auto 24px; max-width:460px; text-shadow:0 2px 6px rgba(0,0,0,.55); font-weight:600; }
-
-  .card { background:rgba(0,12,32,.82); border:2px solid var(--glow); border-radius:16px; padding:20px; margin-bottom:18px; box-shadow:0 0 40px 6px rgba(0,0,0,.4); backdrop-filter:blur(3px); }
-  h2 { font-size:22px; margin:0 0 12px; color:#fff; text-shadow:0 3px 0 #000; }
-
-  .sum { display:flex; gap:22px; align-items:center; flex-wrap:wrap; }
-  .big { text-align:center; min-width:96px; }
+  .sum { display:flex; gap:20px; align-items:center; flex-wrap:wrap; }
+  .big { text-align:center; min-width:90px; }
   .big b { display:block; font-size:58px; line-height:1; color:#fff; -webkit-text-stroke:4px #000; paint-order:stroke fill; }
   .big .st { color:var(--star); letter-spacing:2px; margin:4px 0 2px; }
   .big small { color:var(--mute); }
   .bars { flex:1; min-width:180px; }
-  .bar { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--mute); margin:4px 0; }
-  .bar b { width:12px; color:#fff; }
-  .bar i { flex:1; height:9px; background:#0a2455; border-radius:99px; overflow:hidden; }
-  .bar u { display:block; height:100%; background:linear-gradient(#ffe06b,#ffa800); }
+  .bar { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--mute); margin:3px 0; }
+  .bar b { width:12px; color:var(--ink); font-weight:600; }
+  .bar i { flex:1; height:8px; background:var(--line); border-radius:99px; overflow:hidden; }
+  .bar u { display:block; height:100%; background:var(--star); }
   .bar span { width:24px; text-align:right; }
 
-  .stars { display:flex; gap:4px; margin:0 0 12px; }
-  .stars button { background:none; border:0; padding:0 2px; font-size:50px; line-height:1; color:#2b4478; cursor:pointer; -webkit-text-stroke:3px #000; paint-order:stroke fill; transition:transform .1s; }
-  .stars button.on { color:var(--star); }
+  .stars { display:flex; gap:4px; margin:0 0 14px; }
+  .stars button { background:none; border:0; padding:0 2px; font-size:48px; line-height:1; color:#3a4f7a; cursor:pointer; -webkit-text-stroke:3px #000; paint-order:stroke fill; transition:transform .1s; }
   .stars button:hover { transform:scale(1.15); }
-  label { display:block; font-size:17px; color:#fff; margin:14px 0 4px; text-shadow:0 2px 0 #000; }
-  input,textarea { width:100%; padding:11px 13px; font:inherit; color:#fff; background:#04163a; border:2px solid #1a4a9c; border-radius:10px; outline:0; }
-  input::placeholder,textarea::placeholder { color:#6f8cc0; }
-  input:focus,textarea:focus { border-color:var(--link); box-shadow:0 0 0 3px rgba(130,183,255,.25); }
-  textarea { min-height:92px; resize:vertical; }
-  button.send { margin-top:18px; padding:12px 30px; font-size:24px; color:#fff; background:linear-gradient(#5be36a,#21a437); border:3px solid #000; border-radius:12px; cursor:pointer; -webkit-text-stroke:3px #000; paint-order:stroke fill; box-shadow:0 5px 0 rgba(0,0,0,.45); }
-  button.send:active { transform:translateY(3px); box-shadow:0 2px 0 rgba(0,0,0,.45); }
-  button.send:disabled { background:#4b6190; cursor:default; transform:none; }
-  .msg { display:inline-block; margin-left:12px; font-size:14px; font-weight:600; }
-  .msg.ok { color:#7dff9a; } .msg.err { color:#ff8a80; }
+  .stars button.on { color:var(--star); }
+  .stars button:hover { color:var(--star); }
+  label { display:block; font-size:17px; color:#ffd23f; margin:14px 0 4px; text-shadow:0 2px 0 #000; }
+  input,textarea { width:100%; padding:10px 12px; font:inherit; color:var(--ink); background:#081a3d; border:3px solid #fff; border-radius:10px; outline:0; }
+  input:focus,textarea:focus { border-color:#ffd23f; }
+  textarea { min-height:90px; resize:vertical; }
+  button.send { margin-top:18px; padding:12px 28px; font-size:24px; color:#fff; background:linear-gradient(#5be36a,#21a437); border:4px solid #000; border-radius:12px; cursor:pointer; -webkit-text-stroke:3px #000; paint-order:stroke fill; box-shadow:0 5px 0 rgba(0,0,0,.4); }
+  button.send:active { transform:translateY(3px); box-shadow:0 2px 0 rgba(0,0,0,.4); }
+  button.send:hover { filter:brightness(1.1); }
+  button.send:disabled { background:#5b6f94; cursor:default; filter:none; transform:none; }
+  .msg { display:inline-block; margin-left:12px; font-size:14px; }
+  .msg.ok { color:#5fd38d; } .msg.err { color:#ff8a80; }
 
-  .rev { padding:12px 0; border-top:1px solid var(--glow); }
+  .rev { padding:12px 0; border-top:1px solid var(--line); }
   .rev:first-of-type { border-top:0; padding-top:0; }
   .rev .s { color:var(--star); letter-spacing:1px; }
   .rev .w { color:var(--mute); font-size:13px; }
   .rev p { margin:4px 0 0; white-space:pre-wrap; overflow-wrap:anywhere; }
   .empty { color:var(--mute); }
-
-  /* ground, like the site's footer: darker blocks, a glowing horizon on top, links below */
-  .ground { position:relative; z-index:2; flex:none; margin-top:10px; background:linear-gradient(#0a3f9a,var(--ground) 55%,#000e28); border-top:3px solid #7fc2ff; box-shadow:0 -4px 22px 2px rgba(80,170,255,.75); padding:26px 16px 30px; text-align:center; overflow:hidden; }
-  .ground::before { content:''; position:absolute; inset:0; background:repeating-linear-gradient(90deg, rgba(255,255,255,.05) 0 2px, transparent 2px 96px), repeating-linear-gradient(0deg, rgba(0,0,0,.2) 0 2px, transparent 2px 48px); pointer-events:none; }
-  .ground > * { position:relative; }
-  .soc { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-bottom:14px; }
-  .soc a { display:grid; place-items:center; min-width:48px; height:48px; padding:0 14px; border-radius:12px; background:#0b2c6e; border:3px solid #000; box-shadow:inset 0 0 0 2px #3a82f0; color:#fff; text-decoration:none; font:400 15px Pusab,'Lilita One',sans-serif; }
-  .soc a:hover { background:#1646a3; }
-  .links { font-size:14px; font-weight:600; }
-  .links a { color:var(--link); text-decoration:none; } .links a:hover { color:#fff; }
-  .legal { color:#a9c4ee; font-size:12px; margin:10px auto 0; max-width:520px; }
+  footer { color:#fff; font-size:13px; margin-top:8px; text-shadow:0 2px 0 rgba(0,0,0,.55); font-weight:600; }
+  footer a { color:#ffd23f; }
 </style>
 </head>
 <body>
-<header class="top">
-  <a href="/" aria-label="Back to the game"><img id="logo" alt="Boomlings"></a>
-  <nav><a href="/">Game</a><a href="/rate/" class="on">Rate</a><a href="https://www.geometrydash.com/games/" rel="noopener">More games</a></nav>
-</header>
-<div id="bg"><i id="bgi"></i></div>
-
 <main>
-  <h1>Rate this port</h1>
+  <header><img id="logo" alt="Boomlings"><h1>Rate this port</h1></header>
   <p class="lead">A fan-made browser version of Boomlings. Let me know how it plays and what could be better.</p>
 
   <section class="card">
@@ -115,17 +92,9 @@
     <h2>Reviews</h2>
     <div id="revs"><div class="empty">Loading…</div></div>
   </section>
-</main>
 
-<footer class="ground">
-  <div class="soc">
-    <a href="https://x.com/RobTopGames" rel="noopener" target="_blank">X</a>
-    <a href="https://www.facebook.com/p/RobTop-Games-100081802506994/" rel="noopener" target="_blank">Facebook</a>
-    <a href="https://www.youtube.com/channel/UCz_yk8mDSAnxJq0ar66L4sw" rel="noopener" target="_blank">YouTube</a>
-  </div>
-  <div class="links"><a href="/">Back to the game</a> &nbsp;|&nbsp; <a href="mailto:monochromdum@gmail.com?subject=Boomlings%20feedback">Contact</a> &nbsp;|&nbsp; <a href="https://www.geometrydash.com/games/" rel="noopener">More games</a></div>
-  <p class="legal">Boomlings is made by RobTop Games. This is an unofficial fan port and is not affiliated with them. Font: Pusab by <a href="http://flat-it.com/" rel="noopener" style="color:#82b7ff">Flat-it</a>.</p>
-</footer>
+  <footer><a href="/">← Back to the game</a><br>Boomlings is made by RobTop Games. This is an unofficial fan port and is not affiliated with them. Font: Pusab by <a href="http://flat-it.com/" rel="noopener">Flat-it</a>.</footer>
+</main>
 
 <script type="module">
 import { Atlas } from '/js/atlas.js';
@@ -136,19 +105,7 @@ const ago = (t) => { const s = Math.floor(Date.now() / 1000 - t); if (s < 60) re
 const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* private mode */ } } };
 const starTxt = (n) => '★'.repeat(n) + '☆'.repeat(5 - n);
 
-// backdrop: translucent blue squares of different sizes, tiled so the slow sideways scroll never jumps
-{
-  const W = 1024, H = 640, c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d');
-  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-  for (let i = 0; i < 46; i++) {
-    const s = 60 + Math.floor(rnd() * 5) * 36, px = Math.floor(rnd() * W / 36) * 36, py = Math.floor(rnd() * H / 36) * 36, a = 0.05 + rnd() * 0.1, dark = rnd() < 0.35;
-    x.fillStyle = dark ? `rgba(0,20,70,${a + 0.04})` : `rgba(150,210,255,${a})`;
-    for (const dx of [-W, 0, W]) { x.fillRect(px + dx, py, s, s); x.strokeStyle = dark ? 'rgba(0,10,50,.18)' : 'rgba(200,235,255,.14)'; x.lineWidth = 2; x.strokeRect(px + dx + 1, py + 1, s - 2, s - 2); }
-  }
-  const bgi = $('#bgi'); bgi.style.backgroundImage = `url(${c.toDataURL()})`; bgi.style.backgroundSize = W + 'px ' + H + 'px'; bgi.style.setProperty('--tile', W + 'px');
-}
-
-// just the game's logo in the top bar
+// just the game's logo, small; the rest is plain
 try {
   const menu = await Atlas.load('/assets/menuSheet-hd'), f = menu.frames['boomlingslogo.png'], c = document.createElement('canvas');
   c.width = f.sw; c.height = f.sh; menu.draw(c.getContext('2d'), 'boomlingslogo.png', f.sw / 2, f.sh / 2); $('#logo').src = c.toDataURL();
