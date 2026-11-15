@@ -121,7 +121,8 @@ class App {
     this.swap(() => { this.stack = [new MenuScreen(this)]; });
     G.audio.stopMusic(); G.audio.playMusic('BoomlingsTitle.mp3', 0.5);
   }
-  startFlow() { if (G.save.d.run) { if (!(this.top() instanceof ContinuePanel)) this.stack.push(new ContinuePanel(this)); return; } this.swap(() => { this.stack = [new MenuScreen(this), new PowerSelectScreen(this)]; }); }
+  startFlow() { if (!G.save.seen('tutDone')) { this.swap(() => this.beginGame(1)); return; }   // first launch: Play goes straight into the tutorial game (no Powerups screen)
+    if (G.save.d.run) { if (!(this.top() instanceof ContinuePanel)) this.stack.push(new ContinuePanel(this)); return; } this.swap(() => { this.stack = [new MenuScreen(this), new PowerSelectScreen(this)]; }); }
   // MenuLayer::onDaily -> DailyRewardLayer::create(isNew, day)
   // MenuLayer::onDaily -> GameSocialManager::getDailyReward, which the offline build jumps straight into the Java showDailyReward:
   // Offline.claim("daily", 24h) -> awardGold(50), otherwise the Android "Unavailable" alert

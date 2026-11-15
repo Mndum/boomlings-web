@@ -141,7 +141,7 @@ export class PlayScene {
       const m = /^([grobpy])([BC]?)(\d),(\d)$/.exec(code), attr = m[2] === 'B' ? ATTR.Bomb : m[2] === 'C' ? ATTR.Color : ATTR.Block;
       const cell = this.grid.at(+m[3], +m[4]); this.addPiece(this.createPiece(TUT_COLOR[m[1]], attr), cell, true);
     }
-    this.tut.step = st; this.tut.t0 = performance.now() / 1000; this.busy = false; this.deselect();
+    this.tut.step = st; this.tut.textOutAt = null; this.tut.endAt = null; this.tut.t0 = performance.now() / 1000; this.busy = false; this.deselect();
   }
   tutFinish() {
     this.save.markSeen('tutDone'); this.save.markSeen('basics'); this.save.markSeen('basics2');
@@ -340,6 +340,7 @@ export class PlayScene {
   // ---- powerups ----
   // Slot buttons in the bottom strip: [{ i, tag, x, y, size, usable, left }]
   powerButtons() {
+    if (this.tut) return [];   // the tutorial game has no powerup slots (real bottom panel is empty)
     // UILayer::setupPowerupSlots: buttons are centred, spaced by (sprite width + 30) points, vertically
     // centred in the bottom panel (scaled height 91pt -> centre 44.5pt from the bottom).
     const eq = this.equipped.map((tag, i) => ({ tag, i })).filter((e) => e.tag);
@@ -449,7 +450,7 @@ export class PlayScene {
     if (trail) trail.stop();
     piece.moving = false; this.movingPiece = null; this.path = null;
     this.moves++; this.levelMoves++; this.save.inc('moves');
-    if (this.moves === 2 && this.G.app) setTimeout(() => this.G.app.tutorial('basics2', 'tutorial_basics2_001'), 900);
+    if (this.moves === 2 && this.G.app && !this.tut) setTimeout(() => this.G.app.tutorial('basics2', 'tutorial_basics2_001'), 900);
   }
   newTurnState() { return { chainCount: 0, active: new Set(), specials: new Set(), tasks: [], bombs: 0, colors: new Set() }; }
   async placeAt(piece) {
@@ -638,7 +639,14 @@ export class PlayScene {
   async endTurn() {
     if (this.over) return;
     this.boomMult = 1; this.flatMult = false;
-    if (this.tut) { await this.wait(900); await this.tutNext(); return; }
+    if (this.tut) {
+      // real timeline after the last move settles: pieces/arrow/ring fade (FadeTo 0.2 / FadeOut 0.4), +1.0s the text scales to 0.01 (ScaleTo 0.3, EaseIn 2), +0.45s later the next step starts
+      const t = this.tut, nx = TUT_STEPS[t.i + 1];
+      t.endAt = performance.now() / 1000;
+      if (nx && !nx.keep) for (const p of this.pieces) this.tween(p, { alpha: 0 }, 0.2);
+      await this.wait(1000); t.textOutAt = performance.now() / 1000;
+      await this.wait(450); await this.tutNext(); return;
+    }
     if (this.levelPoints >= this.target) { await this.levelComplete(); this.busy = false; return; }
     await this.newTurn();
   }
@@ -901,7 +909,7 @@ export class PlayScene {
     const now = performance.now() / 1000 - (t.t0 || 0), idle = !this.busy && !this.movingPiece;
     if (idle && mv && mv.piece && tg) {
       const [tx, ty] = this.cellCenter(tg), path = this.grid.findPath(mv, tg);
-      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ui.draw(ctx, 'green_circle_001.png', tx, ty, { scale: 0.497 - 0.097 * Math.cos(2 * Math.PI * (now - 0.5) / 2.05), alpha: 225 / 255 }); ctx.restore(); // GameTutorialManager: additive blend, opacity 225, scale pulsing 0.40..0.59 (ease in/out, 2.05s)
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ui.draw(ctx, 'green_circle_001.png', tx, ty, { scale: 0.497 - 0.097 * Math.cos(2 * Math.PI * (now - 0.5) / 2.05), alpha: 225 / 255 * Math.min(1, now / 1.0) }); ctx.restore();   // CCFadeTo(1, 225) // GameTutorialManager: additive blend, opacity 225, scale pulsing 0.40..0.59 (ease in/out, 2.05s)
       if (path) {
         const pts = [this.cellCenter(mv), ...path.map((c) => this.cellCenter(c))]; let len = 0; const seg = [];
         for (let i = 1; i < pts.length; i++) { const d = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); seg.push(d); len += d; }
@@ -909,18 +917,23 @@ export class PlayScene {
         for (let k = 0; k <= n; k++) {
           let d = len - 45 - (n - k) * 27, i = 0; if (d < 0) continue; while (i < seg.length - 1 && d > seg[i]) { d -= seg[i]; i++; }
           const a = pts[i], b = pts[i + 1], u = seg[i] ? d / seg[i] : 0;
-          // GridArrow::animatePath: every dot loops fadeIn(0.4) / fadeOut(0.4) / rest(0.6), started 0.08s apart from the mover
-          const ph = (((now - k * 0.08) % 1.4) + 1.4) % 1.4, ease = (u) => u * u * (3 - 2 * u);
-          ctx.globalAlpha = ph < 0.4 ? ease(ph / 0.4) : ph < 0.8 ? 1 - ease((ph - 0.4) / 0.4) : 0; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, 8, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
+          // GridArrow::animatePath (traced): every dot loops FadeIn(0.6) + FadeOut(0.6), both CCEaseInOut(2), then DelayTime(0.2); dots start ~0.1s apart
+          const ph = (((now - k * 0.1) % 1.4) + 1.4) % 1.4, ease = (u) => (u < 0.5 ? 2 * u * u : 1 - 2 * (1 - u) * (1 - u));
+          ctx.globalAlpha = ph < 0.6 ? ease(ph / 0.6) : ph < 1.2 ? 1 - ease((ph - 0.6) / 0.6) : 0; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, 8, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
         }
       }
-      const [mx, my] = this.cellCenter(mv); ui.draw(ctx, 'green_arrow_001.png', mx, my - 127 - 9.3 * (1 - Math.cos(2 * Math.PI * (now - 0.55) / 2.05)) / 2);
+      const [mx, my] = this.cellCenter(mv); ui.draw(ctx, 'green_arrow_001.png', mx, my - 127 - 9.3 * (1 - Math.cos(2 * Math.PI * (now - 0.55) / 2.05)) / 2, { alpha: Math.min(1, now / 0.5) });   // CCFadeIn(0.5)
     }
     const sc = 413 / f.measure('Tap and slide', 1);
+    const tNow = performance.now() / 1000, tin = Math.min(1, (tNow - (t.t0 || 0)) / 0.5);      // text: FadeIn(0.5)
+    const tout = t.textOutAt ? Math.min(1, (tNow - t.textOutAt) / 0.3) : 0, tsc = 1 - 0.99 * tout * tout;   // ScaleTo(0.3, 0.01) + EaseIn(2)
+    if (tout >= 1) return;
     (st.text || []).forEach((line, li) => {
       const [sx, sy] = st.textPos[li], cx = sx * 4 / 3, cy = (sy + 3.5 - 40) * 4 / 3, ls = line.length === 1 && line[0][0] === 'OR' ? 0.87 : 1;
       const widths = line.map(([s2]) => f.measure(s2, sc * ls)), tot = widths.reduce((a, b) => a + b, 0); let x = cx - tot / 2;
+      ctx.save(); ctx.globalAlpha = tin; ctx.translate(cx, cy); ctx.scale(tsc, tsc); ctx.translate(-cx, -cy);
       line.forEach(([s2, c], i) => { (c === 'w' ? f : f.multiplied(TUT_RGB[c])).draw(ctx, s2, x, cy, { align: 'left', scale: sc * ls }); x += widths[i]; });
+      ctx.restore();
     });
   }
   drawEffect(ctx, e) {
