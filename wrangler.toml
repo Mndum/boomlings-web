@@ -31,5 +31,5 @@ IAP_COOLDOWN_DAYS = "3"    # one free gold pack per account per this many days
 # Discord login: create an application at discord.com/developers, add the redirect URL  https://YOUR-SITE/api/discord/callback  under OAuth2,
 # put its Client ID here and store the Client Secret with
 #   wrangler secret put DISCORD_CLIENT_SECRET
-# DISCORD_CLIENT_ID = "123456789012345678"
+DISCORD_CLIENT_ID = "1571506657408716854"
 # DISCORD_GUILD_ID = ""   # optional: only players in this Discord server count as friends
