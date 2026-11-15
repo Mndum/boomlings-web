@@ -291,14 +291,15 @@ export class PowerSelectScreen extends Screen {
     this.hits.clear(); this.blankBg(ctx);
     menu.draw(ctx, 'shopBottomBG_001.png', PX(160), PY(350), { scaleX: 1.14, scaleY: 0.74 });
     menu.draw(ctx, 'shopTopBG_001.png', PX(160), PY(155), { scaleX: 1.14, scaleY: 1.35 });
-    menu.draw(ctx, 'SelPowBar_001.png', 320, 129.7);
-    this.sprite(ctx, menu, 'backArrow_001.png', 39.3, -10, 1, () => this.app.back());
-    const g = fmt(save.gold);
-    this.coin(ctx, 610.7, -20, 66); f.gold.draw(ctx, g, 582.3, -9.7, { align: 'right', scale: 1 });
-    menu.draw(ctx, 'yourGold_001.png', 443.1, -22);
+    // positions are the original game's own values (Frida scene dump): canvas px = (2x, 1013.333 - 2y) for layer coordinates (x, y)
+    menu.draw(ctx, 'SelPowBar_001.png', 320, 130);
+    this.sprite(ctx, menu, 'backArrow_001.png', 40, -9.333, 1, () => this.app.back());
+    const g = String(save.gold | 0);   // the original's counter label shows plain digits (no thousands separator)
+    this.coin(ctx, 609.4, -20, 66); f.gold.draw(ctx, g, 582, -9.333, { align: 'right', scale: 1 });
+    menu.draw(ctx, 'yourGold_001.png', 419, -21.333, { ax: 1 });   // right-aligned at x=209.5
     // slots
     for (let i = 0; i < 3; i++) {
-      const x = [159.7, 318, 476.4][i], y = 253, tag = d.equipped[i];
+      const x = [160, 318, 476][i], y = 253.333, tag = d.equipped[i];
       menu.draw(ctx, 'slotBG' + (i + 1) + '_001.png', x, y);
       if (tag && i < d.slots) { const ic = store.pow(tag).ranks[Math.max(0, save.powRank(tag) - 1)].icon.replace('.png', '_on.png'); ui.draw(ctx, ic, x, y, { scale: 0.62 }); }
       this.hits.add(x - 55, y - 55, 110, 110, () => { this.G.audio.play('click08.ogg', 0.6); if (tag) { d.equipped[i] = null; save.flush(); } });
@@ -319,7 +320,7 @@ export class PowerSelectScreen extends Screen {
     // pages
     ctx.save(); ctx.translate(this.px, 0);
     this.pows().forEach((p, k) => {
-      const pg = Math.floor(k / 4), col = k % 4, x = 126.07 + col * 128.17 - (col ? 0.33 : 0) + pg * 640, y = 500, owned = save.powRank(p.tag), eq = d.equipped.includes(p.tag), selected = this.sel === p.tag;
+      const pg = Math.floor(k / 4), col = k % 4, x = 126 + col * 128 + pg * 640, y = 500, owned = save.powRank(p.tag), eq = d.equipped.includes(p.tag), selected = this.sel === p.tag;
       const rk = p.ranks[Math.max(0, owned - 1)], icon = eq ? rk.icon.replace('.png', '_off.png') : selected ? rk.icon.replace('.png', '_on.png') : rk.icon;
       ui.draw(ctx, icon, x, y);
       if (!owned) {
@@ -329,9 +330,9 @@ export class PowerSelectScreen extends Screen {
       this.hits.add(x + this.px - 60, y - 60, 120, 120, () => this.tapPow(p));
     });
     ctx.restore();
-    this.sprite(ctx, menu, 'shopArrowL_001.png', 25.2, 495.3, 1, () => { this.page = Math.max(0, this.page - 1); });
-    this.sprite(ctx, menu, 'shopArrowR_001.png', 614.8, 496.2, 1, () => { this.page = Math.min(1, this.page + 1); });
-    this.sprite(ctx, menu, 'playBtn_001.png', 320, 892.3, 0.9, () => this.app.beginGame(this.startLevel));
+    this.sprite(ctx, menu, 'shopArrowL_001.png', 26, 496, 1, () => { this.page = Math.max(0, this.page - 1); });
+    this.sprite(ctx, menu, 'shopArrowR_001.png', 614, 496, 1, () => { this.page = Math.min(1, this.page + 1); });
+    this.sprite(ctx, menu, 'playBtn_001.png', 320, 892, 0.9, () => this.app.beginGame(this.startLevel));
   }
   // PriceLabel: goldFont number then a coin
   price(ctx, n, x, y, up) {
