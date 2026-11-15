@@ -111,14 +111,18 @@ export class MenuScreen extends Screen {
     const pulse = pt < 0.5 ? p0 + (1.05 - p0) * ease(pt / 0.5) : 1.05 + (0.95 - 1.05) * ease((pt - 0.5) / 0.5);
     ui.draw(ctx, 'dailyBtn_001.png', 550, 186.667, { scale: dk * pulse });
     this.hits.add(550 - dw / 2, 186.667 - dh / 2, dw, dh, () => this.app.claimDaily());
-    menu.draw(ctx, 'robtoplogo_small.png', 120, 953.333);
+    // MenuLayer::onRobTop -> CCApplication::openURL("http://www.robtopgames.com")
+    this.sprite(ctx, menu, 'robtoplogo_small.png', 120, 953.333, 1, () => { try { window.open('http://www.robtopgames.com', '_blank', 'noopener'); } catch (e) { /* popup blocked */ } });
     menu.draw(ctx, 'hello_001.png', 272, 973.333);
-    this.sprite(ctx, menu, 'feedbackBtn_001.png', 60, 853.333, 1, () => this.app.dialog('Feedback', 'Sending feedback needs an internet connection, which the offline version does not have.', [['OK', null]]));
+    this.sprite(ctx, menu, 'feedbackBtn_001.png', 60, 853.333, 1, () => { try { location.href = 'mailto:feedback@boomlings.com'; } catch (e) { /* no mail handler */ } }   // MenuLayer::onFeedback -> GameSocialManager::sendMail(..., "feedback@boomlings.com")
+    );
     menu.draw(ctx, 'feedback_001.png', 176, 873.333);
     const mg = this.G.img.more; ctx.drawImage(mg, 560 - mg.width / 2, 853.333 - mg.height / 2);
     this.hits.add(560 - mg.width / 2, 853.333 - mg.height / 2, mg.width, mg.height, () => this.app.dialog('More Games', 'More games from RobTop need an internet connection.', [['OK', null]]));
-    menu.draw(ctx, 'rate_001.png', 481.988, 953.333);   // the rate label does not move in the original (no action on it)
-    this.sprite(ctx, menu, 'rateBtn_001.png', 580, 953.333, 1, () => this.app.toast('Thanks!', 'Enjoy the game.'));
+    // the rate label slides 5 points right and back forever: CCRepeatForever(CCSequence(CCEaseInOut(CCMoveBy(1s, (5,0)), 2), its reverse)), starting from rateBtn.x - 54 = 236 (MenuLayer::init)
+    { const ph = this.t % 2, u = ph < 1 ? ph : 2 - ph; menu.draw(ctx, 'rate_001.png', 2 * (236 + 5 * ease(u)), 953.333); }
+    // MenuLayer::onRate -> AppDelegate::openAppPage; the offline build's page-opener does nothing visible, so the button only presses
+    this.sprite(ctx, menu, 'rateBtn_001.png', 580, 953.333, 1, () => {});
     const nm = this.G.save.d.name.toUpperCase().slice(0, 12);
     if (this.G.save.d.name !== 'Player') this.f.gold.draw(ctx, nm, 273 + menu.size('hello_001.png')[0] / 2 + 10, 976, { align: 'left', scale: 0.55 });
     this.hits.add(200, 940, 330, 70, () => this.app.rename());

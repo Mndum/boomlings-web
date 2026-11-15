@@ -121,7 +121,12 @@ class App {
   }
   startFlow() { if (G.save.d.run) { if (!(this.top() instanceof ContinuePanel)) this.stack.push(new ContinuePanel(this)); return; } this.swap(() => { this.stack = [new MenuScreen(this), new PowerSelectScreen(this)]; }); }
   // MenuLayer::onDaily -> DailyRewardLayer::create(isNew, day)
-  claimDaily() { const r = G.store.claimDaily(); if (r.isNew) G.audio.play('buyGold001.ogg', 0.8); this.go(new DailyRewardScreen(this, r.day, r.gold, r.isNew)); }
+  // MenuLayer::onDaily -> GameSocialManager::getDailyReward, which the offline build jumps straight into the Java showDailyReward:
+  // Offline.claim("daily", 24h) -> awardGold(50), otherwise the Android "Unavailable" alert
+  claimDaily() {
+    if (G.store.claimOffline('daily', 86400000)) { G.save.addGold(50); return; }
+    this.dialog('Unavailable', 'Check back tomorrow for a new Daily Reward!', [['OK', null]]);
+  }
   rename() {
     const inp = document.createElement('input');
     inp.maxLength = 12; inp.value = G.save.d.name; inp.placeholder = 'Your name';

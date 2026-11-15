@@ -60,7 +60,13 @@ export class Store {
     s.gold -= def.price; s.slots = n; this.save.flush();
     return { ok: true };
   }
-  // Offline replacement for the server-side "daily reward"
+  // Offline.claim(key, cooldownMs): true (and remembers now) once the cooldown has passed (the offline build's SharedPreferences "offline_rewards")
+  claimOffline(key, cooldownMs) {
+    const c = (this.save.d.offlineClaims ||= {}), now = Date.now();
+    if (now - (c[key] || 0) < cooldownMs) return false;
+    c[key] = now; this.save.flush(); return true;
+  }
+  // Offline replacement for the server-side "daily reward" (kept for the DailyRewardLayer screen; the menu button now follows the offline patch above)
   // GameSocialManager::getDailyReward + DailyRewardLayer. The server kept a running count of daily logins; every new
   // day the player collects the count goes up by one (Day 1 the first time) and DailyRewardLayer clamps it to 4.
   // goldForCount: days 1..3 pay 25 / 50 / 100, day 4 and later pay 200.
