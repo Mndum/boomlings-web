@@ -114,7 +114,7 @@ export class MenuScreen extends Screen {
     // MenuLayer::onRobTop -> CCApplication::openURL("https://www.geometrydash.com/")
     this.sprite(ctx, menu, 'robtoplogo_small.png', 120, 953.333, 1, () => { try { window.open('https://www.geometrydash.com/', '_blank', 'noopener'); } catch (e) { /* popup blocked */ } });
     menu.draw(ctx, 'hello_001.png', 272, 973.333);
-    this.sprite(ctx, menu, 'feedbackBtn_001.png', 60, 853.333, 1, () => { try { location.href = 'mailto:feedback@boomlings.com'; } catch (e) { /* no mail handler */ } }   // MenuLayer::onFeedback -> GameSocialManager::sendMail(..., "feedback@boomlings.com")
+    this.sprite(ctx, menu, 'feedbackBtn_001.png', 60, 853.333, 1, () => { try { location.href = 'mailto:monochromdum@gmail.com?subject=Boomlings%20feedback'; } catch (e) { /* no mail handler */ } }   // MenuLayer::onFeedback -> GameSocialManager::sendMail(..., "feedback@boomlings.com")
     );
     menu.draw(ctx, 'feedback_001.png', 176, 873.333);
     const mg = this.G.img.more; ctx.drawImage(mg, 560 - mg.width / 2, 853.333 - mg.height / 2);
