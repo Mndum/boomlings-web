@@ -635,7 +635,7 @@ export class ShareDialog extends ConfirmPurchase {
     if (this.kind === 1) return { text: 'I am a <cg>rank ' + d.rank + '</c>' + nl + '<cy>' + TITLES[Math.min(TITLES.length - 1, d.rank)] + '</c>', plain: 'I am a rank ' + d.rank + ' ' + TITLES[Math.min(TITLES.length - 1, d.rank)] + ' in Boomlings!' };
     return { text: 'You reached' + nl + '<cy>Level ' + this.level + '</c>', plain: 'I reached level ' + this.level + ' in Boomlings!' };
   }
-  share() { const m = this.message().plain; try { navigator.clipboard.writeText(m); } catch (e) { /* no clipboard */ } this.app.toast('Copied', m); }
+  share() { const m = this.message().plain; try { navigator.clipboard.writeText(m).catch(() => {}); } catch (e) { /* no clipboard */ } this.app.toast('Copied', m); }
   // 0 Facebook: its share page; 1 (the invite button): the phone's share sheet, else copy the text; 2 mail
   shareVia(i, text) {
     const site = location.origin + '/', open = (u) => { try { if (!window.open(u, '_blank', 'noopener')) location.href = u; } catch (e) { /* ignore */ } };
@@ -657,12 +657,20 @@ export class ShareDialog extends ConfirmPurchase {
     else { const ic = this.G.store.icons.find((i) => i.id === this.G.save.d.icon), n = 'boomIcon_' + String(ic ? ic.index : 0).padStart(2, '0') + '_001.png', [iw] = this.G.icons.size(n); this.G.icons.draw(ctx, n, 320.3, 453, { scale: iw ? 124 / iw : 1 }); }
     this.hits.clear();
     const sheet = (n) => (menu.frames && menu.frames[n] ? menu : ui);
+    // the buttons pop in one after another (CCEaseBounceOut scale 0 -> 1) once the box has opened; a press squashes them as before
+    this.t0 = this.t0 || performance.now();
+    const pop = (i) => bounceOut(Math.max(0, Math.min(1, (performance.now() - this.t0 - 250 - i * 120) / 500)));
     [['facebookSBtn_001.png', 137.7], ['facebookReqSBtn_001.png', 320], ['mailSBtn_001.png', 502.3]].forEach(([n, x], i) => {
-      const sh = sheet(n), [w, h] = sh.size(n), hx = (x - w / 2) * k + cx - cx * k, hy = (620 - h / 2) * k + cy - cy * k;
+      const sh = sheet(n), [w, h] = sh.size(n), p = pop(i), hx = (x - w / 2) * k + cx - cx * k, hy = (620 - h / 2) * k + cy - cy * k;
+      if (p <= 0) return;
+      ctx.save(); ctx.translate(x, 620); ctx.scale(p, p); ctx.translate(-x, -620);
       this.pressed(ctx, hx, hy, w * k, h * k, x, 620, () => sh.draw(ctx, n, x, 620, {}));
-      this.hits.add(hx, hy, w * k, h * k, () => this.shareVia(i, m.plain));
+      ctx.restore();
+      if (p >= 0.85) this.hits.add(hx, hy, w * k, h * k, () => this.shareVia(i, m.plain));
     });
-    { const n = 'okBtn_001.png', sh = sheet(n), [w, h] = sh.size(n), hx = (500.3 - w / 2) * k + cx - cx * k, hy = (780.3 - h / 2) * k + cy - cy * k; this.pressed(ctx, hx, hy, w * k, h * k, 500.3, 780.3, () => sh.draw(ctx, n, 500.3, 780.3, {})); this.hits.add(hx, hy, w * k, h * k, () => this.app.back()); }
+    { const n = 'okBtn_001.png', sh = sheet(n), [w, h] = sh.size(n), p = pop(3), hx = (500.3 - w / 2) * k + cx - cx * k, hy = (780.3 - h / 2) * k + cy - cy * k;
+      if (p > 0) { ctx.save(); ctx.translate(500.3, 780.3); ctx.scale(p, p); ctx.translate(-500.3, -780.3); this.pressed(ctx, hx, hy, w * k, h * k, 500.3, 780.3, () => sh.draw(ctx, n, 500.3, 780.3, {})); ctx.restore(); }
+      this.hits.add(hx, hy, w * k, h * k, () => this.app.back()); }
     ctx.restore();
   }
 }
