@@ -196,7 +196,7 @@ const routes = {
     const fail = async (msg) => { await env.DB.prepare("UPDATE discord_states SET status = 'error', error = ? WHERE nonce = ?").bind(msg, nonce).run(); return page(msg); };
     if (!code) return fail('Discord login was cancelled.');
     const dc = await discordProfile(env, code, url.origin + '/api/discord/callback');
-    if (!dc) return fail('Discord did not accept that login. Try again.');
+    if (!dc || dc.error) return fail('Discord did not accept that login' + (dc && dc.error ? ' (' + dc.error + ')' : '') + '. Try again.');
     const guilds = JSON.stringify(env.DISCORD_GUILD_ID ? dc.guilds.filter((g) => g === String(env.DISCORD_GUILD_ID)) : dc.guilds.slice(0, 300));
     const owner = await env.DB.prepare('SELECT * FROM users WHERE discord_id = ?').bind(dc.id).first();
     let uid, kind;
@@ -277,8 +277,9 @@ const discordOn = (env) => !!(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET
 async function discordProfile(env, code, redirect) {
   const api = env.DISCORD_API || 'https://discord.com/api';
   const H = { 'user-agent': 'DiscordBot (https://github.com/Mndum/boomlings-web, 1)' };
-  const tok = await fetch(api + '/oauth2/token', { method: 'POST', headers: { ...H, 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ client_id: env.DISCORD_CLIENT_ID, client_secret: env.DISCORD_CLIENT_SECRET, grant_type: 'authorization_code', code, redirect_uri: redirect }) }).then((r) => r.json()).catch(() => null);
-  if (!tok || !tok.access_token) return null;
+  const tr = await fetch(api + '/oauth2/token', { method: 'POST', headers: { ...H, 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ client_id: env.DISCORD_CLIENT_ID, client_secret: env.DISCORD_CLIENT_SECRET, grant_type: 'authorization_code', code, redirect_uri: redirect }) }).catch(() => null);
+  const txt = tr ? await tr.text() : '', tok = (() => { try { return JSON.parse(txt); } catch (e) { return null; } })();
+  if (!tok || !tok.access_token) return { error: tr ? 'Discord said ' + tr.status + ' ' + (tok ? (tok.error || '') + ' ' + (tok.error_description || '') : txt.replace(/<[^>]*>/g, ' ').slice(0, 80)).trim() : 'could not reach Discord' };
   const A = { ...H, authorization: 'Bearer ' + tok.access_token };
   const [me, gs] = await Promise.all([fetch(api + '/users/@me', { headers: A }).then((r) => r.json()).catch(() => null), fetch(api + '/users/@me/guilds', { headers: A }).then((r) => r.json()).catch(() => null)]);
   if (!me || !me.id) return null;
