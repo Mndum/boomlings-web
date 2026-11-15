@@ -28,6 +28,8 @@ REF_REWARD_NEW = "100"     # gold for the player who enters a code
 REF_REWARD_OWNER = "100"   # gold for the code's owner
 REF_MAX_PER_OWNER = "50"
 IAP_COOLDOWN_DAYS = "3"    # one free gold pack per account per this many days
-# Facebook login: create an app at developers.facebook.com, put its App ID here, and store the secret with
-#   wrangler secret put FB_APP_SECRET
-# FB_APP_ID = "123456789012345"
+# Discord login: create an application at discord.com/developers, add the redirect URL  https://YOUR-SITE/api/discord/callback  under OAuth2,
+# put its Client ID here and store the Client Secret with
+#   wrangler secret put DISCORD_CLIENT_SECRET
+# DISCORD_CLIENT_ID = "123456789012345678"
+# DISCORD_GUILD_ID = ""   # optional: only players in this Discord server count as friends

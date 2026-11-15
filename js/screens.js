@@ -1,5 +1,6 @@
 // Menu screens rebuilt from the decompiled layer code. The game lays everything out in a 320x480 y-up point
 // space; here every coordinate is converted with PX/PY to the 640x960 y-down canvas.
+import { discordBtn } from './account.js';
 import { W, H, CH, OY, Hits, ScrollArea, roundRect, richText } from './ui.js';
 import { nineSlice } from './atlas.js';
 import { TITLES } from './rules.js';
@@ -174,16 +175,17 @@ export function brownList(ctx, x, y, w, h, gx0 = 0, gx1 = 0, rim = 3, topRim = 4
   ctx.restore();
 }
 
-// ---- Facebook friends leaderboard (only when the backend has Facebook set up and this player is linked)
-const fbFriendsOn = (s) => { const a = s.G.api; return !!(a && a.online && a.fbAppId && a.user && a.user.fb && s.fr !== 'expired'); };
-const fbButton = (s) => { const a = s.G.api; if (a && a.online && a.fbAppId) s.app.fb().then((ok) => { if (ok) s.fr = undefined; }); else if (a && a.online) s.app.dialog('Facebook', 'Facebook login is not set up on this server yet.', [['OK', null]]); else s.app.dialog('Offline', 'Facebook is not available in the offline version of the game.', [['OK', null]]); };
+// ---- friends leaderboard: players who share a Discord server (only when the backend has Discord set up and this player is linked)
+const friendsOn = (s) => { const a = s.G.api; return !!(a && a.online && a.discordOn && a.user && a.user.discord); };
+const discordOnly = (s) => !!(s.G.api && s.G.api.online && s.G.api.discordOn);
+const loginButton = (s) => { const a = s.G.api; if (a && a.online && a.discordOn) s.app.discord().then((ok) => { if (ok) s.fr = undefined; }); else s.app.dialog('Offline', 'Facebook is not available in the offline version of the game.', [['OK', null]]); };
 function friendsOnline(s, ctx, sc, cy) {
   const api = s.G.api;
-  if (s.fr === undefined) { s.fr = null; api.fbFriends().then((j) => { s.fr = j; }).catch((e) => { s.fr = e && e.fbExpired ? 'expired' : false; }); }
+  if (s.fr === undefined) { s.fr = null; api.discordFriends().then((j) => { s.fr = j; }).catch(() => { s.fr = false; }); }
   if (s.fr === null) { const img = spinnerImg(s.G); if (img) { ctx.save(); ctx.translate(sc.w / 2, cy); ctx.rotate(s.t * 5.2); ctx.drawImage(img, -img.width / 2, -img.height / 2); ctx.restore(); } sc.contentH = sc.h; return; }
   if (s.fr === false) { s.f.gold.draw(ctx, 'COULD NOT LOAD', sc.w / 2, 150, { scale: 0.62 }); sc.contentH = sc.h; return; }
   const list = s.fr.entries, me = api.user && api.user.name;
-  if (!list.length) { s.f.gold.draw(ctx, 'NO FRIENDS ON THE', sc.w / 2, 110, { scale: 0.62 }); s.f.gold.draw(ctx, 'LEADERBOARD YET', sc.w / 2, 156, { scale: 0.62 }); }
+  if (!list.length) { s.f.gold.draw(ctx, 'NOBODY FROM YOUR', sc.w / 2, 110, { scale: 0.62 }); s.f.gold.draw(ctx, 'SERVER HAS SCORED YET', sc.w / 2, 156, { scale: 0.62 }); }
   list.forEach((e, i) => highscoreRow(s, ctx, { ...e, icon: e.icon || 'kIcon_001' }, i, 4 + i * 80, sc.w, i % 2 ? 0.14 : 0.0, !!me && e.name === me));
   sc.contentH = Math.max(sc.h, 4 + list.length * 80);
 }
@@ -206,9 +208,9 @@ export class ExtrasPanel extends SlidePanel {
     brownList(ctx, sc.x, sc.y, sc.w, sc.h, 0, 0, 6.5, 7.3);
     sc.begin(ctx);
     if (this.tab === 'local') this.drawLocal(ctx, sc);
-    else if (this.tab === 'global' && this.G.api && this.G.api.online) this.drawOnline(ctx, sc);
+    else if ((this.tab === 'global' || this.tab === 'ach') && this.G.api && this.G.api.online) this.drawOnline(ctx, sc);   // trophy tab = the top 50 players
     else if (this.tab === 'global' || this.tab === 'ach') this.drawSpinner(ctx, sc);
-    else if (this.tab === 'friends') { if (fbFriendsOn(this)) friendsOnline(this, ctx, sc, 540 - sc.y); else this.drawFriends(ctx, sc); }
+    else if (this.tab === 'friends') { if (friendsOn(this)) friendsOnline(this, ctx, sc, 540 - sc.y); else this.drawFriends(ctx, sc); }
     else this.drawSpinner(ctx, sc);
     sc.end(ctx); sc.clamp(); sc.scrollbar(ctx);
     ui.draw(ctx, 'blueBottomBar_001.png', 320, 880);
@@ -235,10 +237,10 @@ export class ExtrasPanel extends SlidePanel {
     this.drawStats(ctx, sc, 180);
   }
   drawFriends(ctx, sc) {
-    richText(ctx, this.f.gold, 'Login to Facebook to compare scores with friends.', 105.7, 215, { scale: 0.79, maxWidth: 400, lineHeight: 48.7 });
+    richText(ctx, this.f.gold, discordOnly(this) ? 'Login to Discord to compare scores with your server.' : 'Login to Facebook to compare scores with friends.', 105.7, 215, { scale: 0.79, maxWidth: 400, lineHeight: 48.7 });
     const bx = 300.33, by = 373.63;
-    ctx.save(); ctx.translate(0, 0); this.G.ui.draw(ctx, 'fbLogInBtn_001.png', bx, by);
-    this.rowHit(bx - 116, by - 40, 232, 80, () => fbButton(this));
+    ctx.save(); ctx.translate(0, 0); if (discordOnly(this)) discordBtn(ctx, this.G, bx, by); else this.G.ui.draw(ctx, 'fbLogInBtn_001.png', bx, by);
+    this.rowHit(bx - 116, by - 40, 232, 80, () => loginButton(this));
     ctx.restore();
     sc.contentH = sc.h;
   }
@@ -807,10 +809,10 @@ export class ResultsScreen extends Screen {
       const L = this.G.save.d.scores.slice(0, 20);
       L.forEach((r, i) => highscoreRow(this, ctx, r, i, 4 + i * 80, sc.w, i % 2 ? 0.14 : 0.0, i === s.lbIndex));
       sc.contentH = 4 + L.length * 80;
-    } else if (this.tab === 'friends' && fbFriendsOn(this)) {
+    } else if (this.tab === 'friends' && friendsOn(this)) {
       friendsOnline(this, ctx, sc, sc.h / 2);
     } else if (this.tab === 'friends') {
-      richText(ctx, f.gold, 'Login to Facebook to compare scores with friends.', 105.07, 81.6, { scale: 0.79, maxWidth: 400, lineHeight: 46 }); ui.draw(ctx, 'fbLogInBtn_001.png', 299.53, 237.57); this.hits.add(sc.x + 299.53 - 116, sc.y + 237.57 - 40, 232, 80, () => fbButton(this)); sc.contentH = sc.h;
+      richText(ctx, f.gold, discordOnly(this) ? 'Login to Discord to compare scores with your server.' : 'Login to Facebook to compare scores with friends.', 105.07, 81.6, { scale: 0.79, maxWidth: 400, lineHeight: 46 }); if (discordOnly(this)) discordBtn(ctx, this.G, 299.53, 237.57); else ui.draw(ctx, 'fbLogInBtn_001.png', 299.53, 237.57); this.hits.add(sc.x + 299.53 - 116, sc.y + 237.57 - 40, 232, 80, () => loginButton(this)); sc.contentH = sc.h;
     } else if (this.tab === 'stats') {
       ExtrasPanel.prototype.drawStats.call(this, ctx, sc);
     } else {

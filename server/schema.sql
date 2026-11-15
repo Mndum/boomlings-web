@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS users (
   last_iap    INTEGER NOT NULL DEFAULT 0,  -- when they last took a free gold pack
   banned      INTEGER NOT NULL DEFAULT 0,
   ban_reason  TEXT,
-  fb_id       TEXT,                        -- linked Facebook account (Facebook login / friends leaderboard)
+  discord_id  TEXT,                        -- linked Discord account (Discord login)
+  discord_guilds TEXT,                     -- JSON list of the Discord server ids they are in (the friends leaderboard)
   created_at  INTEGER NOT NULL
 );
 
@@ -94,5 +95,15 @@ CREATE TABLE IF NOT EXISTS ratings (
 );
 CREATE INDEX IF NOT EXISTS ratings_at ON ratings(at DESC);
 
--- existing databases: ALTER TABLE users ADD COLUMN fb_id TEXT; first, then this index
-CREATE UNIQUE INDEX IF NOT EXISTS users_fb ON users(fb_id);
+-- existing databases: ALTER TABLE users ADD COLUMN discord_id TEXT; and ADD COLUMN discord_guilds TEXT; first, then this index
+CREATE UNIQUE INDEX IF NOT EXISTS users_discord ON users(discord_id);
+
+-- a Discord login in progress: started by the game, finished in a popup, collected by the game (all within 15 minutes)
+CREATE TABLE IF NOT EXISTS discord_states (
+  nonce      TEXT PRIMARY KEY,
+  user_id    INTEGER,          -- signed-in player to link, or NULL for a plain login
+  created_at INTEGER NOT NULL,
+  status     TEXT,             -- NULL while waiting, then login / created / linked / error
+  result_id  INTEGER,
+  error      TEXT
+);

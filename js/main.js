@@ -14,7 +14,7 @@ import { ExtrasScreen, IconSelect, ContinuePanel } from './extras.js';
 import { FreeGoldScreen } from './freegold.js';
 import { Api } from './api.js';
 import { Pranks } from './pranks.js';
-import { accountFlow, fbConnect } from './account.js';
+import { accountFlow, discordConnect } from './account.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -118,7 +118,7 @@ class App {
   }
   dialog(t, m, b) { this.go(new Dialog(this, t, m, b)); }
   account() { return accountFlow(this); }
-  fb() { return fbConnect(this); }
+  discord() { return discordConnect(this); }
   netError() { this.go(new Dialog(this, 'Error', 'Something went wrong. Please try again later!', [['OK', null]], true)); } // offline: LoadingCircle, then the same error the real game shows now that its servers are gone
   toast(title, sub, sfx) { this.toasts.push({ title, sub, t: 0 }); if (sfx) G.audio.play(sfx, 0.8); }
   toMenu() {
