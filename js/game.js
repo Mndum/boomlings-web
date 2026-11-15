@@ -865,8 +865,7 @@ export class PlayScene {
     const { obj, ui, fonts } = this.G;
     // PlayLayer::createLayers: two TileBGColor strips tinted (0x72,0x4a,0x23) fill the screen behind the tiles
     // letterbox bands (colours sampled from the real game on a 480x800 screen)
-    { const OYb = 53, g1 = ctx.createLinearGradient(0, -OYb, 0, 0); g1.addColorStop(0, '#223599'); g1.addColorStop(0.25, '#133386'); g1.addColorStop(0.5, '#14256c'); g1.addColorStop(0.8, '#112264'); g1.addColorStop(1, '#11184b'); ctx.fillStyle = g1; ctx.fillRect(0, -OYb, W, OYb);
-      const g2 = ctx.createLinearGradient(0, H, 0, H + OYb); g2.addColorStop(0, '#112264'); g2.addColorStop(0.4, '#112155'); g2.addColorStop(1, '#061f4a'); ctx.fillStyle = g2; ctx.fillRect(0, H, W, OYb); }
+    this.drawBands(ctx);
     ctx.fillStyle = '#724a23'; ctx.fillRect(0, 0, W, H);
     for (const c of this.grid.cells) {
       const [x, y] = this.cellCenter(c);
@@ -890,6 +889,7 @@ export class PlayScene {
     if (this.selected) { const [x, y] = this.cellCenter(this.selected); ui.draw(ctx, 'selectOverlay_001.png', x, y, { alpha: 0.9 }); }
     for (const e of this.effects) this.drawEffect(ctx, e);
     this.drawShop(ctx);
+    this.drawBands(ctx);   // the letterbox bands sit above the game layer, so particles / trails that leave the board go behind them
     this.drawHUD(ctx);
     this.drawTut(ctx);   // GameTutorialManager's arrow / ring / text sit above the UILayer (the real arrow overlaps the HUD bar)
     if (this.levelText) {
@@ -902,6 +902,11 @@ export class PlayScene {
       const s = this.bigText.scale * (1 + 0.15 * Math.sin(Math.min(1, k * 4) * Math.PI));
       fonts.big.draw(ctx, this.bigText.text, W / 2, GRID_Y + GRID * CELL / 2, { scale: s, alpha: a });
     }
+  }
+  // letterbox bands (colours sampled from the real game on a 480x800 screen); the bottom one starts at the colour of the panel above it
+  drawBands(ctx) {
+    const OYb = 53, g1 = ctx.createLinearGradient(0, -OYb, 0, 0); g1.addColorStop(0, '#223599'); g1.addColorStop(0.25, '#133386'); g1.addColorStop(0.5, '#14256c'); g1.addColorStop(0.8, '#112264'); g1.addColorStop(1, '#11184b'); ctx.fillStyle = g1; ctx.fillRect(0, -OYb, W, OYb);
+    const g2 = ctx.createLinearGradient(0, H, 0, H + OYb); g2.addColorStop(0, 'rgb(17,29,82)'); g2.addColorStop(0.5, 'rgb(15,28,80)'); g2.addColorStop(1, 'rgb(14,26,76)'); ctx.fillStyle = g2; ctx.fillRect(0, H, W, OYb);
   }
   // tutorial overlay: target ring, dotted path, bobbing arrow (GridArrow) and the instruction text
   drawTut(ctx) {
