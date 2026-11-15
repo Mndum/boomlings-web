@@ -1,7 +1,7 @@
 // Sound effects + music through the Web Audio API (not <audio> elements), so the browser/OS media player
 // (the "Boomlings - play/pause/next" overlay) never picks the game up. Unlocked by the first user gesture.
 export class AudioMan {
-  constructor(base) { this.base = base; this.buf = {}; this.music = null; this.musicName = null; this.enabled = true; this.musicOn = true; this.unlocked = false; this.mv = 1; this.sv = 1; this.ac = null; }
+  constructor(base) { this.base = base; this.buf = {}; this.music = null; this.musicName = null; this.enabled = true; this.musicOn = true; this.unlocked = false; this.mv = 1; this.sv = 1; this.ac = null; this.haptics = true; }
   ctx() {
     if (!this.ac) {
       const C = window.AudioContext || window.webkitAudioContext; if (!C) return null;
@@ -25,7 +25,25 @@ export class AudioMan {
     }
     return this.buf[name];
   }
+  // Haptics (Android browsers; iPhones have no vibration API): every game sound has a matching buzz, so taps, pops, blasts and rewards all feel right
+  buzz(name) {
+    if (!this.haptics || !navigator.vibrate || !this.unlocked) return;
+    const n = name.replace(/\.(ogg|mp3)$/, '');
+    let p = null;
+    if (/^click/.test(n) || n === 'pause01') p = 8;
+    else if (/^(pop|pops|res02|counter|spinner|starSound)/.test(n)) p = 12;
+    else if (/^(stoneHit|splat|splatSound|mystery(Enter|Appear|Trigger))/.test(n)) p = 22;
+    else if (n === 'chainTest01' || n === 'lightning5' || n === 'pipeenter02' || n === 'megaBeep001') p = 28;
+    else if (/^(bombbbb|frostBoom2|megaExplode|megaSplat|skullEnding|megaEnter)/.test(n)) p = [60, 25, 40];
+    else if (/^(alert|whoa|skullTest|showTutorial)/.test(n)) p = 30;
+    else if (/^(getAch|unlock|levelComplete|lvlup|lvlPulse|highscore|buyGold|mysteryReward)/.test(n)) p = [20, 40, 30, 40, 50];
+    if (p === null) return;
+    const t = performance.now(); if (t - (this.lastBuzz || 0) < 30 && !Array.isArray(p)) return;   // a new buzz cancels the old one: do not stutter
+    this.lastBuzz = t;
+    try { navigator.vibrate(p); } catch (e) { /* not allowed */ }
+  }
   play(name, vol = 1) {
+    this.buzz(name);
     if (!this.enabled || !this.unlocked) return;
     const ac = this.ctx(); if (!ac) return;
     this.load(name).then((b) => {

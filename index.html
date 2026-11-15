@@ -6,7 +6,7 @@
 <link rel="icon" type="image/png" sizes="64x64" href="icons/favicon.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#0b1020">
+<meta name="theme-color" content="#000000">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -17,8 +17,9 @@
   html, body { margin: 0; height: 100%; background: #0b1020; overflow: hidden; touch-action: none; overscroll-behavior: none; -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; }
   html { position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100%; }   /* no pull-to-refresh / rubber-banding on phones */
   @supports (height: 100dvh) { html, body { height: 100dvh; } }   /* the visible height, not the height behind the URL bar */
-  body { display: flex; align-items: center; justify-content: center; font-family: sans-serif; }
-  #game { display: block; image-rendering: auto; background: #0b1020; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-user-drag: none; }
+  body { position: fixed; top: 0; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center; font-family: sans-serif; }   /* the game sits dead centre in the visible screen */
+  @media (pointer: coarse) { html, body, body #game { background: #000; } #rotate { background: #000; } }   /* phones and tablets: pure black borders around the game */
+  #game { display: block; margin: auto; flex: none; image-rendering: auto; background: #0b1020; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-user-drag: none; }
   /* phones held sideways: the game is a tall portrait layout, ask to turn the phone (the game pauses itself behind this) */
   #rotate { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 50; background: #0b1020; color: #ffd84a; font: 700 22px/1.4 sans-serif; text-align: center; align-items: center; justify-content: center; padding: 24px; }
   @media (orientation: landscape) and (max-height: 520px) and (pointer: coarse) { #rotate { display: flex; } }

@@ -203,7 +203,7 @@ async function boot() {
     G.api = new Api(G); G.api.init().then(() => { G.pranks = new Pranks(G, app, canvas, W, CH); G.pranks.start(); });   // optional backend: stays offline when the site is not served with the Worker
     ach.onUnlock = (a) => app.toast('Achievement unlocked!', a.title, 'getAch001.ogg');
     ach.onIconUnlock = (ic) => app.toast('You unlocked ' + ic.title + '!', 'New icon', 'unlock004.ogg');
-    G.audio.musicOn = save.d.opts.music; G.audio.enabled = save.d.opts.sfx; G.audio.mv = save.d.opts.mv ?? 1; G.audio.sv = save.d.opts.sv ?? 1;
+    G.audio.musicOn = save.d.opts.music; G.audio.enabled = save.d.opts.sfx; G.audio.haptics = save.d.opts.haptics !== false; G.audio.mv = save.d.opts.mv ?? 1; G.audio.sv = save.d.opts.sv ?? 1;
     G.audio.preload(SFX_ALL);
     G.scene = new PlayScene(G);
     window.snap = async (n) => (await fetch('http://localhost:8766/save?name=' + n, { method: 'POST', body: canvas.toDataURL('image/png') })).status; // dev: save the canvas for pixel comparison

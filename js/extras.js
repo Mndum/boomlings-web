@@ -119,6 +119,10 @@ export class OptionsPanel extends SlidePanel {
     this.button(ctx, 'Reset Tutorial', 320, 286.7, 216, 33, () => this.app.dialog('Reset Tutorial', 'Do you want to <cg>reset</c> the <cy>Tutorial</c>? All guides and hints will be reset.', [['Cancel', null], ['Yes', () => { d.tut = {}; save.flush(); }]]), { scale: 1 });
     this.button(ctx, 'Support', 320, 393, 216, 33, () => this.app.netError(), { scale: 1 });
     this.pressed(ctx, 204, 466, 232, 80, 320, 506, () => (this.G.api && this.G.api.discordOn ? discordBtn(ctx, this.G, 320, 506) : ui.draw(ctx, 'fbLogInBtn_001.png', 320, 506))); this.hits.add(204, 466, 232, 80, () => (this.G.api && this.G.api.discordOn ? this.app.discord() : this.app.account()));
+    if (navigator.vibrate) {   // phones that can vibrate (Android): switch the haptics on or off
+      const on = d.opts.haptics !== false;
+      this.button(ctx, 'Haptics: ' + (on ? 'On' : 'Off'), 320, 585, 216, 33, () => { d.opts.haptics = !on; this.G.audio.haptics = !on; save.flush(); if (!on) { try { navigator.vibrate(40); } catch (e) { /* ignore */ } } }, { scale: 1 });
+    }
     [['Music', d.opts.mv ?? 1], ['Effects', d.opts.sv ?? 1]].forEach(([lab, v], i) => {
       const g = this.geom(i), gr = this.G.img.groove, bar = this.G.img.sliderbar, tx = g.x + (g.w - 13) * v;
       f.gold.draw(ctx, lab + ', ' + Math.round(v * 100) + '%', 320, g.y - 40, { scale: 0.79 });
