@@ -12,20 +12,20 @@ export class ExtrasScreen extends Screen {
   draw(ctx) {
     const { menu, ui, save } = this.G, d = save.d, f = this.f;
     this.hits.clear(); this.bg(ctx);
-    this.sprite(ctx, menu, 'backArrow_001.png', 40, -13, 1, () => this.app.back());
-    this.sprite(ctx, ui, 'shareBtn_001.png', 560.67, 14.33, 1, () => this.share());
+    this.sprite(ctx, menu, 'backArrow_001.png', 40, -9.333, 1, () => this.app.back());
+    this.sprite(ctx, ui, 'shareBtn_001.png', 560, 14.667, 0.976, () => this.share());
     const ic = this.G.store.icons.find((i) => i.id === d.icon);
-    this.G.icons.draw(ctx, 'boomIcon_' + String(ic ? ic.index : 0).padStart(2, '0') + '_001.png', 320.67, 91, { scale: 1.0 });
+    this.G.icons.draw(ctx, 'boomIcon_' + String(ic ? ic.index : 0).padStart(2, '0') + '_001.png', 320, 86.667, { scale: 1.0 });
     this.hits.add(250, 20, 140, 140, () => this.app.go(new this.app.IconSelect(this.app)));
-    menu.draw(ctx, 'changeNote_001.png', 500, 116);
-    this.nameText(ctx, d.name.slice(0, 12), 318.6, 218.33, 1.44);
+    menu.draw(ctx, 'changeNote_001.png', 500, 116.667);
+    this.nameText(ctx, d.name.slice(0, 12), 320, 218.2, 1.47);
     this.hits.add(120, 170, 400, 90, () => this.app.rename());
     // rank bar
-    ui.draw(ctx, 'XPBarBGBG_001.png', 318.63, 339.37);
-    ui.draw(ctx, 'XPBarBG_001.png', 374.33, 342.67); ui.draw(ctx, 'XP_Border_001.png', 374.33, 342.67);
+    ui.draw(ctx, 'XPBarBGBG_001.png', 320, 342.2);   // BoomXPBar node at (160, 335.56) in the original: children at x +0 / +25 / -112, label at (+25, -1)
+    ui.draw(ctx, 'XPBarBG_001.png', 370, 342.2); ui.draw(ctx, 'XP_Border_001.png', 370, 342.2);
     const barW = ui.size('XPBarBG_001.png')[0] - 16, barH = ui.size('XPBarBG_001.png')[1] - 22;
-    this.rankIcon(ctx, d.rank, 95.67, 345, 61);
-    f.big.draw(ctx, TITLES[Math.min(TITLES.length - 1, d.rank)].toUpperCase(), 371.63, 345.7, { scale: 0.72 });
+    this.rankIcon(ctx, d.rank, 96, 342.2, 61);
+    f.big.draw(ctx, TITLES[Math.min(TITLES.length - 1, d.rank)].toUpperCase(), 370, 344.2, { scale: 0.735 });
     const items = [['highscoresBtn_001.png', 496, () => this.app.go(new this.app.Highscores(this.app))], ['mainStatsBtn_001.png', 607.63, () => this.app.go(new StatsPanel(this.app))], ['achievementsBtn_001.png', 715.7, () => this.app.go(new AchPanel(this.app))], ['mainOptionsBtn_001.png', 820, () => this.app.go(new OptionsPanel(this.app))]];
     for (const [n, y, fn] of items) { const k = n === 'achievementsBtn_001.png' ? 0.9 : 1; const [w, h] = [menu.size(n)[0] * k, menu.size(n)[1] * k]; this.pressed(ctx, 320 - w / 2, y - h / 2, w, h, 320, y, () => menu.draw(ctx, n, 320, y, { scale: k })); this.hits.add(320 - w / 2, y - h / 2, w, h, fn); }
   }

@@ -425,7 +425,7 @@ export class ShopScreen extends Screen {
     if (this.tab === 'iap') { const bf = this.G.fonts.big; bf.draw(ctx, 'IAP', 168.7, -6.7 + 6, { scale: 80 / bf.measure('IAP', 1) }); this.f.gold.draw(ctx, 'Billing not supported', 320, 480.7, { scale: 440 / this.f.gold.measure('Billing not supported', 1) }); }
     else menu.draw(ctx, { items: 'tabLabelItems_001.png', pow: 'tabLabelPow_001.png', icons: 'tabLabelIcons_001.png' }[this.tab], 168.7, -6.7);
     menu.draw(ctx, 'goldBg_001.png', 505, -4);
-    const g = fmt(save.gold); this.f.gold.draw(ctx, g, 576, 1, { align: 'right', scale: 0.86 }); this.coin(ctx, 596, -7, 49);
+    const g = String(save.gold | 0); this.f.gold.draw(ctx, g, 575, 1.67, { align: 'right', scale: 0.8 }); this.coin(ctx, 596, -7, 49);
     if (n > 1 || this.tab === 'iap') {
       this.sprite(ctx, menu, 'shopArrowL_001.png', 31.7, 480, 1, () => { this.page[this.tab] = wrap ? pg - 1 : Math.max(0, pg - 1); });
       this.sprite(ctx, menu, 'shopArrowR_001.png', 608.3, 480, 1, () => { this.page[this.tab] = wrap ? pg + 1 : Math.min(n - 1, pg + 1); });
@@ -452,7 +452,9 @@ export class ShopScreen extends Screen {
     else { ic(e.icon, X(320), 269, 139); if (e.count) f.gold.draw(ctx, 'x' + e.count, X(357), 233, { scale: 0.8 }); }
     if (e.kind === 'item') f.gold.draw(ctx, String(e.have), X(89.3), 179, { align: 'left', scale: 0.99 });
     if (e.kind !== 'slot' && !e.owned && e.kind !== 'item') ui.draw(ctx, 'lock_icon_001.png', X(349), 243, { scale: 0.75 });
-    if (e.kind !== 'icon' && !e.owned) { const fg = ui.has('freeBtn_001.png') ? 'freeBtn_001.png' : null; if (fg) { ui.draw(ctx, fg, X(500), 189); if (hit) this.hits.add(440, 130, 120, 110, () => this.app.dialog('Error', 'Something went wrong. Please try again later!', [['OK', null]])); } }
+    // ShopItemLayer::updateItemButton shows the Free Gold gem only while the player cannot afford the price (the button then reads "Buy Gold");
+    // ShopItemLayer::onFreeGold -> showTapJoyOffers, which the offline build turns into Offline.claim("offers", 10 min) -> awardGold(25)
+    if (e.kind !== 'icon' && !e.owned && e.price > this.G.save.gold) { const fg = ui.has('freeBtn_001.png') ? 'freeBtn_001.png' : null; if (fg) { ui.draw(ctx, fg, X(500), 189); if (hit) this.hits.add(440, 130, 120, 110, () => { if (this.G.store.claimOffline('offers', 600000)) this.G.save.addGold(25); else this.app.dialog('Unavailable', 'No offers right now. Check back in 10 minutes!', [['OK', null]]); }); } }
     // price / state + button
     if (e.kind === 'icon' && e.owned) this.btnLabel(ctx, e.selected ? 'Selected' : 'Select', X(320), 413, e.selected ? 213 : 187, hit && !e.selected ? () => { this.G.save.d.icon = e.id; this.G.save.flush(); } : null, e.selected);
     else if (e.owned) this.btnLabel(ctx, e.kind === 'pow' ? 'Maxed' : 'Owned', X(320), 413, 187, null, true);
