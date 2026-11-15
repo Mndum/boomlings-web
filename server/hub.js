@@ -12,6 +12,12 @@ export class Hub extends DurableObject {
   att(ws) { return ws.deserializeAttachment() || {}; }
 
   async fetch(req) {
+    // internal poke from the Worker (never from a browser: liveSocket only forwards WebSocket upgrades): "your coins changed, claim now"
+    if (req.method === 'POST' && req.headers.get('x-internal') === 'claim') {
+      const id = +req.headers.get('x-uid'); let n = 0;
+      for (const p of this.players(id)) { send(p, { t: 'claim' }); n++; }
+      return new Response(String(n));
+    }
     if (req.headers.get('upgrade') !== 'websocket') return new Response('expected websocket', { status: 426 });
     const role = req.headers.get('x-role'), proto = req.headers.get('sec-websocket-protocol');
     const [client, server] = Object.values(new WebSocketPair());

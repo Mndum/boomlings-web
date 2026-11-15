@@ -27,6 +27,10 @@ async function editSaveGold(env, id, fn) {
   if (!s) return;
   try { const d = JSON.parse(s.data); d.gold = Math.max(0, fn(Number(d.gold) || 0)); await env.DB.prepare('UPDATE saves SET data = ? WHERE user_id = ?').bind(JSON.stringify(d), id).run(); } catch (e) { /* unreadable save: leave it */ }
 }
+// tell the player's open game to claim right now, so coins an admin gives or takes show up live (a player who is offline gets them on next open)
+async function pokeClaim(env, id) {
+  try { await env.HUB.get(env.HUB.idFromName('main')).fetch('https://hub/claim', { method: 'POST', headers: { 'x-internal': 'claim', 'x-uid': String(id) } }); } catch (e) { /* not online: it will claim on next open */ }
+}
 const PRANKS = new Set(['message', 'toast', 'sound', 'fakegold', 'flip', 'mirror', 'tiny', 'wobble', 'rainbow', 'invert', 'gray', 'sepia', 'blur', 'zoomies', 'shake', 'bounce', 'squish', 'ghost', 'flicker', 'drunk', 'nightmare', 'emojirain', 'speak', 'vibrate', 'chipmunk', 'slowmo', 'bombrain', 'iconrain', 'spin', 'pulse', 'tilt', 'silence', 'blackout', 'jumpscare', 'fakeads', 'fakeoffline', 'fakebattery', 'bandit', 'fakecrashpc', 'fakecrashandroid', 'fakecrashios', 'fakeupdate', 'fakeban']);
 const cleanQ = (s) => String(s || '').toLowerCase().replace(/[%_\\]/g, ' ').trim().slice(0, 30);
 
@@ -129,19 +133,22 @@ const admin = {
         const g = Math.floor(+b.gold);
         if (!(g >= 1 && g <= 1000000)) return bad('Gold must be 1 to 1,000,000');
         await env.DB.prepare('UPDATE users SET earned_gold = earned_gold + ? WHERE id = ?').bind(g, id).run();
-        await logAct(env, 'gift gold', u, g + ' gold (arrives next time they open the game)'); break;
+        await pokeClaim(env, id);
+        await logAct(env, 'gift gold', u, g + ' gold (live if they are online, otherwise when they next open the game)'); break;
       }
       case 'takeGold': {
         const g = Math.floor(+b.gold);
         if (!(g >= 1 && g <= 1000000000)) return bad('Enter how many coins to take');
         await env.DB.prepare('UPDATE users SET take_gold = take_gold + ? WHERE id = ?').bind(g, id).run();
         await editSaveGold(env, id, (c) => c - g);
-        await logAct(env, 'take coins', u, g + ' coins (removed from their game next time they open it)'); break;
+        await pokeClaim(env, id);
+        await logAct(env, 'take coins', u, g + ' coins (live if they are online, otherwise when they next open the game)'); break;
       }
       case 'wipeGold':
         await env.DB.prepare('UPDATE users SET wipe_gold = 1, take_gold = 0 WHERE id = ?').bind(id).run();
         await editSaveGold(env, id, () => 0);
-        await logAct(env, 'set coins to 0', u, 'applied next time they open the game'); break;
+        await pokeClaim(env, id);
+        await logAct(env, 'set coins to 0', u, 'live if they are online, otherwise when they next open the game'); break;
       case 'resetIap': await env.DB.prepare('UPDATE users SET last_iap = 0 WHERE id = ?').bind(id).run(); await logAct(env, 'reset free-gold timer', u); break;
       case 'rename': {
         const nm = String(b.name || '').trim();

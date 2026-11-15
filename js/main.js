@@ -261,8 +261,10 @@ function drawToasts(dt) {
   const y = -90 + 110 * Math.max(0, Math.min(1, k));
   ctx.save(); ctx.globalAlpha = Math.max(0, Math.min(1, k * 1.2));
   panel(ctx, 40, y, W - 80, 80, { r: 18, fill: 'rgba(10,40,100,0.95)', stroke: '#ffd84a' });
-  G.fonts.gold.draw(ctx, t.title.toUpperCase(), W / 2, y + 28, { scale: 0.5 });
-  G.fonts.chat.draw(ctx, t.sub, W / 2, y + 56, { scale: 0.62 });
+  const fit = (font, txt, sc) => { const w = font.measure(txt, sc), max = W - 120; return w > max ? sc * max / w : sc; };   // long titles shrink to stay inside the banner
+  const tt = t.title.toUpperCase();
+  G.fonts.gold.draw(ctx, tt, W / 2, y + 28, { scale: fit(G.fonts.gold, tt, 0.5) });
+  G.fonts.chat.draw(ctx, t.sub, W / 2, y + 56, { scale: fit(G.fonts.chat, t.sub, 0.62) });
   ctx.restore();
   if (t.t >= dur) app.toasts.shift();
 }

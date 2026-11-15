@@ -28,7 +28,7 @@ export class Pranks {
     let ws; try { ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/api/ws', [api.token]); } catch (e) { this.connecting = false; return; }
     this.ws = ws;
     ws.onopen = () => { this.connecting = false; this.retry = 1000; this.nextTry = 0; this.lastSig = ''; this.tick(); };
-    ws.onmessage = (ev) => { let m; try { m = JSON.parse(ev.data); } catch (e) { return; } if (m.t === 'stream') this.stream(m.on); else if (m.t === 'prank') this.run(m); };
+    ws.onmessage = (ev) => { let m; try { m = JSON.parse(ev.data); } catch (e) { return; } if (m.t === 'stream') this.stream(m.on); else if (m.t === 'prank') this.run(m); else if (m.t === 'claim') this.claimNow(); };
     ws.onclose = () => { this.connecting = false; this.stream(false); this.ws = null; this.nextTry = Date.now() + this.retry; this.retry = Math.min(60000, this.retry * 2); };
     ws.onerror = () => { this.connecting = false; };
   }
@@ -36,6 +36,11 @@ export class Pranks {
   state() {
     const sc = this.G.scene, sv = this.G.save && this.G.save.d, playing = this.screenName() === 'Play' && sc;
     return { screen: this.screenName(), score: playing ? Math.floor(sc.score || 0) : 0, level: playing ? sc.level || 0 : 0, gold: sv ? sv.gold : 0, rank: sv ? sv.rank : 0, icon: sv ? sv.icon : '', effects: Object.keys(this.fx) };
+  }
+  // an admin gave or took coins: apply it now, so the coin counter changes while they play
+  claimNow() {
+    const sv = this.G.save, before = sv.d.gold;
+    this.G.api.claim().then(() => { const diff = sv.d.gold - before; if (diff > 0) this.app.toast('You got ' + diff.toLocaleString('en-US') + ' gold!', 'A gift just arrived', 'buyGold001.ogg'); else if (diff < 0) this.app.toast('Gold removed', Math.abs(diff).toLocaleString('en-US') + ' gold taken away'); }).catch(() => {});
   }
   // frames only while somebody watches
   stream(on) {

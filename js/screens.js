@@ -565,13 +565,16 @@ export class Dialog extends Screen {
   }
   drawBox(ctx, k) {
     // FLAlertLayer measured from the real game: 495x274.7 box centred on the screen
-    const w = 495, h = 274.7, cx = 320, cy = 480;
+    // the measured box fits up to 3 lines of text; a longer message makes the box taller (text can never run into the buttons)
+    if (this._mh === undefined) { const t = document.createElement('canvas').getContext('2d'); this._mh = richText(t, this.f.chat, this.msg, 0, 0, { scale: 0.99, maxWidth: 440, align: 'center', lineHeight: 40 }); }
+    const ex = this._mh > 120 ? this._mh - 120 + 36 : 0, w = 495, h = 274.7 + ex, cx = 320, cy = 480;
     ctx.save(); ctx.translate(cx, cy); ctx.scale(k, k); ctx.translate(-cx, -cy);
     nineSlice(ctx, this.G.img.sq01, cx - w / 2, cy - h / 2 - 1.8, w, h, 56);
-    this.f.gold.draw(ctx, this.titleText, cx, cy - 74, { scale: 0.9 });
-    richText(ctx, this.f.chat, this.msg, cx - 1.3, cy - 30.3, { scale: 0.99, maxWidth: 440, align: 'center', lineHeight: 40 });
+    const tsc = Math.min(0.9, 0.9 * 430 / Math.max(1, this.f.gold.measure(this.titleText, 0.9)));   // a long title shrinks to fit the box
+    this.f.gold.draw(ctx, this.titleText, cx, cy - 74 - ex / 2, { scale: tsc });
+    richText(ctx, this.f.chat, this.msg, cx - 1.3, cy - 30.3 - ex / 2, { scale: 0.99, maxWidth: 440, align: 'center', lineHeight: 40 });
     const sc = 0.8, ws = this.buttons.map(([l]) => Math.max(109, this.f.gold.measure(l, sc) + 33)), gap = 33, tot = ws.reduce((a, b2) => a + b2, 0) + gap * (ws.length - 1);
-    let bx = cx - tot / 2; const by = cy + 81.3;
+    let bx = cx - tot / 2; const by = cy + 81.3 + ex / 2;
     this.buttons.forEach(([label, fn], i) => {
       const bw = ws[i];
       this.pressed(ctx, bx, by - 30, bw, 61, bx + bw / 2, by, () => {
