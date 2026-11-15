@@ -871,7 +871,7 @@ export class PlayScene {
     for (const c of this.grid.cells) {
       const [x, y] = this.cellCenter(c);
       obj.draw(ctx, (c.x + c.y) % 2 ? 'TileDark01_001.png' : 'TileLight01_001.png', x, y);
-      if (this.reachable.has(c)) { ctx.fillStyle = 'rgba(255,255,255,0.28)'; ctx.fillRect(x - CELL / 2 + 1, y - CELL / 2 + 1, CELL - 2, CELL - 2); }
+      if (this.reachable.has(c)) { ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.fillRect(x - CELL / 2 + 1, y - CELL / 2 + 1, CELL - 2, CELL - 2); }
     }
     if (this.path) for (const c of this.path) { const [x, y] = this.cellCenter(c); ui.draw(ctx, 'whiteDot_001.png', x, y, { alpha: 0.6, scale: 0.7 }); }
     if (this.G.fx) this.G.fx.draw(ctx, 'trail');
