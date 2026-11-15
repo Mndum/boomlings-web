@@ -27,7 +27,7 @@ async function editSaveGold(env, id, fn) {
   if (!s) return;
   try { const d = JSON.parse(s.data); d.gold = Math.max(0, fn(Number(d.gold) || 0)); await env.DB.prepare('UPDATE saves SET data = ? WHERE user_id = ?').bind(JSON.stringify(d), id).run(); } catch (e) { /* unreadable save: leave it */ }
 }
-const PRANKS = new Set(['message', 'toast', 'sound', 'fakegold', 'flip', 'mirror', 'tiny', 'wobble', 'rainbow', 'invert', 'gray', 'sepia', 'blur', 'zoomies', 'shake', 'bounce', 'squish', 'ghost', 'flicker', 'drunk', 'nightmare', 'emojirain', 'speak', 'vibrate', 'chipmunk', 'slowmo', 'fakecrashpc', 'fakecrashandroid', 'fakecrashios', 'fakeupdate', 'fakeban']);
+const PRANKS = new Set(['message', 'toast', 'sound', 'fakegold', 'flip', 'mirror', 'tiny', 'wobble', 'rainbow', 'invert', 'gray', 'sepia', 'blur', 'zoomies', 'shake', 'bounce', 'squish', 'ghost', 'flicker', 'drunk', 'nightmare', 'emojirain', 'speak', 'vibrate', 'chipmunk', 'slowmo', 'bombrain', 'iconrain', 'spin', 'pulse', 'tilt', 'silence', 'blackout', 'jumpscare', 'fakeads', 'fakeoffline', 'fakebattery', 'bandit', 'fakecrashpc', 'fakecrashandroid', 'fakecrashios', 'fakeupdate', 'fakeban']);
 const cleanQ = (s) => String(s || '').toLowerCase().replace(/[%_\\]/g, ' ').trim().slice(0, 30);
 
 const admin = {

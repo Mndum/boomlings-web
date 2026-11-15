@@ -359,6 +359,12 @@ const PRANKS = [
   ['fakecrashpc', '🖥️', 'Fake crash (PC)', 'Windows "Boomlings.exe has stopped working" box', 8], ['fakecrashandroid', '🤖', 'Fake crash (Android)', '"Boomlings keeps stopping" box', 8],
   ['fakecrashios', '🍎', 'Fake crash (iPhone)', 'iOS-style "Boomlings Quit Unexpectedly" alert', 8], ['fakeupdate', '⬇️', 'Fake update', 'Stuck on "Installing update 99%"', 10],
   ['fakeban', '🔨', 'Fake ban', 'Says they are banned ... then "just kidding"', 0],
+  ['bombrain', '💣', 'Bomb rain', 'Bombs fall over the game', 8], ['iconrain', '🎉', 'Boomling party', 'Every Boomling icon rains down', 8],
+  ['spin', '🌀', 'Spin cycle', 'The whole game rotates round and round', 10], ['pulse', '💓', 'Heartbeat', 'Game pulses bigger and smaller', 10],
+  ['tilt', '📐', 'Crooked', 'Game stays tilted a little', 12], ['silence', '🔇', 'Mute', 'All music and sounds cut out', 12],
+  ['blackout', '🌑', 'Blackout', 'Screen goes black, just eyes', 5], ['jumpscare', '😱', 'Jump scare', 'A huge bomb appears with a bang', 2],
+  ['fakeads', '📺', 'Fake ad', 'An ad with a countdown blocks the game', 6], ['fakeoffline', '📡', 'Fake offline', 'The game\'s own "Something went wrong" error', 0],
+  ['fakebattery', '🪫', 'Low battery', '"Battery low: 1%" warning', 8], ['bandit', '🦹', 'Bandit steals gold', 'Says gold was stolen ... just kidding', 0],
 ];
 let liveWS = null, liveClosing = false, liveFrames = 0;
 function liveStop() { liveClosing = true; clearInterval(liveTimer); if (liveWS) { try { liveWS.close(); } catch (e) { /* ignore */ } liveWS = null; } }
@@ -385,7 +391,6 @@ async function live() {
     v.querySelectorAll('.pranks .btn').forEach((b) => b.onclick = async () => {
       const q = PRANKS.find((x) => x[0] === b.dataset.k), msg = { t: 'prank', id: liveAll ? 'all' : liveSel, type: q[0], secs: q[4] };
       if (q[0] === 'message') { const r = await dialog({ title: 'Send a pop-up', fields: [{ label: 'Title (40 max)', value: 'Hello!' }, { label: 'Message (140 max)', value: 'I can see you...' }], ok: 'Send it' }); if (!r) return; msg.text = r[0]; msg.text2 = r[1]; }
-      if (q[0] === 'speak') { const r = await dialog({ title: 'Say something', fields: [{ label: 'Text to read aloud (140 max)', value: 'I can see you playing' }], ok: 'Send it' }); if (!r) return; msg.text2 = r[0]; }
       if (q[0] === 'speak') { const r = await dialog({ title: 'Say something', fields: [{ label: 'Text to read aloud (140 max)', value: 'I can see you playing' }], ok: 'Send it' }); if (!r) return; msg.text2 = r[0]; }
       if (q[0] === 'toast') { const r = await dialog({ title: 'Fake achievement', fields: [{ label: 'Title', value: 'Achievement unlocked!' }, { label: 'Subtitle', value: 'Stared at the screen' }], ok: 'Send it' }); if (!r) return; msg.text = r[0]; msg.text2 = r[1]; }
       if (liveWS && liveWS.readyState === 1) liveWS.send(JSON.stringify(msg)); else toast('Not connected');

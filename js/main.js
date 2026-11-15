@@ -211,6 +211,8 @@ async function boot() {
     ach.onIconUnlock = (ic) => app.toast('You unlocked ' + ic.title + '!', 'New icon', 'unlock004.ogg');
     G.audio.musicOn = save.d.opts.music; G.audio.enabled = save.d.opts.sfx; G.audio.haptics = save.d.opts.haptics !== false; G.audio.mv = save.d.opts.mv ?? 1; G.audio.sv = save.d.opts.sv ?? 1;
     G.audio.preload(SFX_ALL);
+    if (G.audio.musicOn) G.audio.auto('BoomlingsTitle.mp3', 0.5);   // music from the moment the game loads (starts at the first tap/key if the browser blocks it until then)
+    for (const ev of ['pointerdown', 'mousedown', 'keydown', 'touchend', 'pointerup']) addEventListener(ev, () => G.audio.kick(), { capture: true });
     G.scene = new PlayScene(G);
     window.snap = async (n) => (await fetch('http://localhost:8766/save?name=' + n, { method: 'POST', body: canvas.toDataURL('image/png') })).status; // dev: save the canvas for pixel comparison
     // dev: record the canvas every frame to the local receiver for animation comparison

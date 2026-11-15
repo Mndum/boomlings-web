@@ -45,7 +45,7 @@ export class AudioMan {
   play(name, vol = 1) {
     this.buzz(name);
     if (!this.enabled || !this.unlocked) return;
-    const ac = this.ctx(); if (!ac) return;
+    const ac = this.ctx(); if (!ac || ac.state !== 'running') return;   // not allowed to make sound yet: do not queue clicks that would all burst out later
     this.load(name).then((b) => {
       if (!b) return;
       try { const s = ac.createBufferSource(), g = ac.createGain(); s.buffer = b; g.gain.value = Math.min(1, vol * this.sv); s.connect(g); g.connect(ac.destination); s.start(0); } catch (e) { /* ignore */ }
@@ -73,6 +73,9 @@ export class AudioMan {
   suspend() { if (this.ac && this.ac.state === 'running') this.ac.suspend().catch(() => {}); }
   // phones suspend (or "interrupt") the audio context when the page loses focus; any touch wakes it again
   resume() { if (this.unlocked && this.ac && this.ac.state !== 'running') this.ac.resume().catch(() => {}); }
+  // load time: start the title music straight away. Browsers keep the sound muted until the first tap/key, so it begins the moment they allow it
+  auto(name, vol) { this.unlock(); this.playMusic(name, vol); }
+  kick() { if (!this.ac || this.ac.state !== 'running') this.unlock(); }
   // must run inside a touch/click: resumes the context and plays one silent sample, which is what unlocks sound on iOS
   unlock() {
     this.unlocked = true; const ac = this.ctx(); if (!ac) return;

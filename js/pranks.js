@@ -55,7 +55,25 @@ export class Pranks {
       case 'speak': try { const u = new SpeechSynthesisUtterance(TXT(p.text2, 140) || 'Hello there'); u.rate = 0.95; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch (e) { /* no speech on this device */ } return;
       case 'vibrate': try { if (navigator.vibrate) navigator.vibrate(Array.from({ length: secs * 2 }, (_, i) => (i % 2 ? 150 : 250))); } catch (e) { /* ignore */ } return;
       case 'chipmunk': case 'slowmo': this.musicRate(p.type === 'chipmunk' ? 2 : 0.5, secs); return;
-      case 'emojirain': this.emojiRain(secs); return;
+      case 'emojirain': this.emojiRain(secs, 'blob'); return;
+      case 'bombrain': this.emojiRain(secs, 'bomb'); return;
+      case 'iconrain': this.emojiRain(secs, 'icon'); return;
+      case 'silence': { const au = this.G.audio, was = au.enabled, mv = au.mv; au.enabled = false; au.setMusicVol(0); setTimeout(() => { au.enabled = was; au.setMusicVol(mv); }, secs * 1000); return; }
+      case 'blackout': this.overlay('<div style="font-size:64px">&#128064;</div>', Math.min(secs, 8), '#000', false); return;
+      case 'jumpscare': {
+        const o = this.G.obj, nm = 'MegaBomb_r_001.png', c = document.createElement('canvas'); c.width = c.height = 420;
+        if (o && o.has(nm)) o.draw(c.getContext('2d'), nm, 210, 210, { scale: 400 / Math.max(...o.size(nm)) });
+        this.overlay('<img src="' + c.toDataURL() + '" style="width:min(90vw,70vh);animation:jsc .12s infinite alternate"><style>@keyframes jsc{from{transform:scale(.95) rotate(-3deg)}to{transform:scale(1.08) rotate(3deg)}}</style>', 2, '#000', false);
+        this.G.audio.play('bombbbb.ogg', 1); try { if (navigator.vibrate) navigator.vibrate([200, 80, 200]); } catch (e) { /* ignore */ } return;
+      }
+      case 'fakeads': {
+        const n = Math.min(secs, 8);
+        this.overlay('<div style="background:#fff;color:#222;border-radius:10px;padding:18px 22px;width:min(78vw,300px);text-align:center;font:16px/1.4 sans-serif;box-shadow:0 8px 30px #000a"><small style="opacity:.6">ADVERTISEMENT</small><div style="font-size:54px;margin:8px 0">&#127942;</div><b>Your game continues in <span id="adn">' + n + '</span></b><p style="margin:8px 0 0;font-size:13px;opacity:.7">Boomlings Premium: no ads, no fun!</p></div>', n, 'rgba(0,0,0,.7)', false);
+        let k = n; const t = setInterval(() => { k--; const e = document.getElementById('adn'); if (e && k >= 0) e.textContent = k; else clearInterval(t); }, 1000); return;
+      }
+      case 'fakeoffline': this.app.netError(); return;
+      case 'fakebattery': this.overlay('<div style="background:#2b2b2b;color:#eee;border-radius:14px;padding:20px;width:min(80vw,300px);font:16px/1.4 sans-serif;box-shadow:0 8px 30px #000a"><b style="font-size:19px">&#128267; Battery low: 1%</b><p style="margin:10px 0 18px;opacity:.8">Close apps to save battery. Your device will turn off soon.</p><div style="text-align:right;color:#6cf;font-weight:700"><span data-x style="cursor:pointer">OK</span></div></div>', secs, 'rgba(0,0,0,.55)', true); return;
+      case 'bandit': this.app.toast('A bandit stole your gold!', '-500 gold ... just kidding', 'bombbbb.ogg'); return;
       case 'fakecrashpc': case 'fakecrash': this.overlay('<div style="background:#f0f0f0;color:#000;border:1px solid #2a6;box-shadow:0 8px 30px #000a;width:min(88vw,420px);font:14px/1.4 Segoe UI,Tahoma,sans-serif"><div style="background:#fff;padding:7px 10px;display:flex;justify-content:space-between"><span>Boomlings</span><b data-x style="cursor:pointer;padding:0 6px">X</b></div><div style="padding:18px 16px;display:flex;gap:14px;align-items:center;background:#fff"><div style="font-size:34px;color:#c00">&#9940;</div><div><b style="font-size:16px;color:#003399">Boomlings.exe has stopped working</b><br>Windows is checking for a solution to the problem...</div></div><div style="padding:10px 14px;text-align:right;background:#f0f0f0"><span data-x style="display:inline-block;border:1px solid #707070;background:#e1e1e1;padding:3px 16px;cursor:pointer">Close program</span></div></div>', secs, 'rgba(0,0,0,.45)', true); return;
       case 'fakecrashandroid': this.overlay('<div style="background:#2b2b2b;color:#eee;border-radius:14px;padding:20px;width:min(80vw,300px);font:16px/1.4 Roboto,sans-serif;box-shadow:0 8px 30px #000a"><b style="font-size:19px">Boomlings keeps stopping</b><p style="margin:10px 0 18px;opacity:.8">Do you want to close the app, or send feedback?</p><div style="text-align:right;color:#6cf;font-weight:700"><span data-x style="margin-right:22px;cursor:pointer">APP INFO</span><span data-x style="cursor:pointer">CLOSE APP</span></div></div>', secs, 'rgba(0,0,0,.55)', true); return;
       case 'fakecrashios': this.overlay('<div style="background:rgba(246,246,246,.96);color:#000;border-radius:14px;width:min(72vw,270px);text-align:center;font:-apple-system,system-ui,sans-serif;font:15px/1.35 -apple-system,system-ui,sans-serif;box-shadow:0 8px 30px #0008"><div style="padding:18px 16px 14px"><b style="font-size:17px">&#8220;Boomlings&#8221; Quit Unexpectedly</b><p style="margin:6px 0 0;font-size:13px">Do you want to send a report to the developer?</p></div><div data-x style="border-top:1px solid #c8c8c8;padding:11px;color:#007aff;cursor:pointer">Don&#8217;t Send</div><div data-x style="border-top:1px solid #c8c8c8;padding:11px;color:#007aff;font-weight:600;cursor:pointer">Send</div></div>', secs, 'rgba(0,0,0,.4)', true); return;
@@ -75,6 +93,9 @@ export class Pranks {
     if (this.flipX) tr.push('scaleX(-1)');
     if (on('tiny')) tr.push('scale(0.55)');
     if (on('wobble')) tr.push('rotate(var(--wob, 0deg))');
+    if (on('spin')) tr.push('rotate(var(--sp, 0deg))');
+    if (on('pulse')) tr.push('scale(var(--pl, 1))');
+    if (on('tilt')) tr.push('rotate(9deg)');
     if (on('rainbow')) fl.push('hue-rotate(var(--hue, 0deg))');
     if (on('invert')) fl.push('invert(1)');
     if (on('gray')) fl.push('grayscale(1)');
@@ -89,10 +110,10 @@ export class Pranks {
     if (on('nightmare')) fl.push('invert(1) hue-rotate(160deg) contrast(1.3)');
     const s = this.canvas.style; s.transform = tr.join(' '); s.filter = fl.join(' '); s.opacity = on('ghost') ? '0.3' : '';
     clearInterval(this.anim);
-    const moving = ['wobble', 'rainbow', 'shake', 'bounce', 'drunk', 'flicker'];
+    const moving = ['spin', 'pulse', 'wobble', 'rainbow', 'shake', 'bounce', 'drunk', 'flicker'];
     if (moving.some(on)) this.anim = setInterval(() => {
       const x = performance.now() / 1000;
-      s.setProperty('--wob', Math.sin(x * 3) * 6 + 'deg'); s.setProperty('--hue', (x * 180) % 360 + 'deg');
+      s.setProperty('--wob', Math.sin(x * 3) * 6 + 'deg'); s.setProperty('--sp', (x * 140) % 360 + 'deg'); s.setProperty('--pl', 1 + Math.sin(x * 4) * 0.18); s.setProperty('--hue', (x * 180) % 360 + 'deg');
       s.setProperty('--tx', (Math.random() * 20 - 10) + 'px'); s.setProperty('--ty', (Math.random() * 20 - 10) + 'px');
       s.setProperty('--by', -Math.abs(Math.sin(x * 5)) * 70 + 'px');
       s.setProperty('--dr', Math.sin(x * 1.3) * 3 + 'deg'); s.setProperty('--bl', (Math.sin(x * 2) + 1) * 2 + 'px');
@@ -109,19 +130,20 @@ export class Pranks {
     if (closable) d.querySelectorAll('[data-x]').forEach((b) => b.addEventListener('click', end));
     setTimeout(end, secs * 1000);
   }
-  // Boomling blobs falling over the game, drawn on a pointer-transparent layer for `secs` seconds
-  emojiRain(secs) {
-    const c = document.createElement('canvas'), W = (c.width = innerWidth), H = (c.height = innerHeight), x = c.getContext('2d'), obj = this.G.obj;
+  // sprites falling over the game on a pointer-transparent layer for `secs` seconds: Boomling blobs, bombs or the player icons
+  emojiRain(secs, kind = 'blob') {
+    const c = document.createElement('canvas'), W = (c.width = innerWidth), H = (c.height = innerHeight), x = c.getContext('2d');
+    const atlas = kind === 'icon' ? this.G.icons : this.G.obj;
     c.style.cssText = 'position:fixed;top:0;left:0;z-index:39;pointer-events:none';
     document.body.appendChild(c);
-    const C = ['b', 'g', 'o', 'p', 'r', 'y'], names = C.map((k) => 'Block_' + k + '_Charge_001.png').filter((n) => obj && obj.has(n));
+    const C = ['b', 'g', 'o', 'p', 'r', 'y'];
+    const names = (kind === 'icon' ? Array.from({ length: 50 }, (_, i) => 'boomIcon_' + String(i).padStart(2, '0') + '_001.png') : C.map((k) => (kind === 'bomb' ? 'Bomb_' + k + '_001.png' : 'Block_' + k + '_Charge_001.png'))).filter((n) => atlas && atlas.has(n));
     if (!names.length) { c.remove(); return; }
-    const [bw] = obj.size(names[0]);
-    const drops = Array.from({ length: 40 }, () => { const px = 36 + Math.random() * 56; return { x: Math.random() * W, y: -Math.random() * H, v: 2 + Math.random() * 5, n: names[(Math.random() * names.length) | 0], k: px / bw, r: Math.random() * 6, w: (Math.random() - 0.5) * 0.08 }; });
+    const drops = Array.from({ length: 40 }, () => { const n = names[(Math.random() * names.length) | 0], px = 40 + Math.random() * 56; return { x: Math.random() * W, y: -Math.random() * H, v: 2 + Math.random() * 5, n, k: px / atlas.size(n)[0], r: Math.random() * 6, w: (Math.random() - 0.5) * 0.08 }; });
     const end = performance.now() + secs * 1000;
     const step = () => {
       x.clearRect(0, 0, W, H);
-      for (const d of drops) { d.y += d.v; d.r += d.w; if (d.y > H + 60) { d.y = -60; d.x = Math.random() * W; } obj.draw(x, d.n, d.x, d.y, { scale: d.k, rot: d.r }); }
+      for (const d of drops) { d.y += d.v; d.r += d.w; if (d.y > H + 60) { d.y = -60; d.x = Math.random() * W; } atlas.draw(x, d.n, d.x, d.y, { scale: d.k, rot: d.r }); }
       if (performance.now() < end) requestAnimationFrame(step); else c.remove();
     };
     requestAnimationFrame(step);
