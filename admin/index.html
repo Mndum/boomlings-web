@@ -112,7 +112,7 @@
   .pl img { width:44px; height:64px; object-fit:cover; border-radius:6px; background:#071a42; flex:none; }
   .dot { display:inline-block; width:9px; height:9px; border-radius:50%; background:var(--good); margin-right:6px; }
   .screen { display:flex; gap:16px; padding:16px; flex-wrap:wrap; }
-  .screen img { width:192px; height:285px; border-radius:12px; background:#071a42; border:1px solid var(--line); }
+  .screen img { width:216px; height:360px; border-radius:12px; background:#071a42; border:1px solid var(--line); }
   .kv { display:grid; grid-template-columns:1fr 1fr; gap:8px; flex:1; min-width:180px; align-content:start; }
   .kv div { background:var(--bg); border-radius:10px; padding:8px 10px; }
   .kv small { display:block; color:var(--mute); font-size:12px; }
@@ -201,7 +201,7 @@ async function enter() {
   try { await api('GET', 'stats'); } catch (e) { $('#loginErr').textContent = KEY ? e.message : ''; return false; }
   $('#login').classList.add('hidden'); $('#app').classList.remove('hidden'); route(); return true;
 }
-function signOut() { if (KEY) fetch('/api/admin/logout', { method: 'POST', headers: { 'x-admin-token': KEY } }).catch(() => {}); KEY = ''; sessionStorage.removeItem('adminToken'); $('#app').classList.add('hidden'); $('#login').classList.remove('hidden'); closeSheet(); }
+function signOut() { if (typeof liveStop === 'function') liveStop(); if (KEY) fetch('/api/admin/logout', { method: 'POST', headers: { 'x-admin-token': KEY } }).catch(() => {}); KEY = ''; sessionStorage.removeItem('adminToken'); $('#app').classList.add('hidden'); $('#login').classList.remove('hidden'); closeSheet(); }
 $('#loginForm').onsubmit = async (e) => {
   e.preventDefault(); $('#loginErr').textContent = '';
   const r = await fetch('/api/admin/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ user: $('#user').value, pass: $('#key').value }) });
@@ -216,7 +216,7 @@ function route() {
   if (!KEY) return;
   const [, tab = 'overview', id] = location.hash.split('/');
   document.querySelectorAll('nav a').forEach((a) => a.classList.toggle('on', a.dataset.t === tab));
-  clearInterval(liveTimer);
+  liveStop();
   ({ overview, players, live, leaderboard, log: logView }[tab] || overview)();
   if (tab === 'players' && id) openPlayer(+id); else closeSheet(true);
 }
@@ -322,29 +322,52 @@ const PRANKS = [
   ['sound', '🔔', 'Sound spam', 'Plays random game sounds', 8], ['fakegold', '🤑', 'Fake jackpot', '"+1,000,000 gold" ... just kidding', 0],
   ['toast', '🏆', 'Fake achievement', 'Pops an achievement banner', 0], ['message', '💬', 'Send message', 'Pop-up dialog with your text', 0],
 ];
+let liveWS = null, liveClosing = false, liveFrames = 0;
+function liveStop() { liveClosing = true; clearInterval(liveTimer); if (liveWS) { try { liveWS.close(); } catch (e) { /* ignore */ } liveWS = null; } }
 async function live() {
   const m = $('#main');
-  m.innerHTML = '<h2>Live &amp; Pranks</h2><p class="sub">Players who are in the game right now (updates every 2 seconds). Pick one, watch their screen, and play a harmless, time-limited prank. Nothing touches their save.</p><div class="live"><div class="card" id="lvList"><h3>Online now</h3><div class="empty">Loading…</div></div><div class="card" id="lvView"><div class="empty">Pick a player on the left.</div></div></div>';
-  let players = [];
-  const draw = () => {
+  m.innerHTML = '<h2>Live &amp; Pranks</h2><p class="sub">A real-time view of everyone in the game right now. Pick a player to watch their screen live (about 9 frames a second), then play a harmless, time-limited prank. Nothing touches their save.</p><div class="live"><div class="card" id="lvList"><h3>Online now</h3><div class="empty">Connecting…</div></div><div class="card" id="lvView"><div class="empty">Pick a player on the left.</div></div></div>';
+  const players = new Map();   // id -> { id, name, state }
+  let status = 'Connecting…';
+  const list = () => {
     if (!$('#lvList')) return;
-    $('#lvList').innerHTML = '<h3>Online now <span class="badge">' + players.length + '</span></h3>' + (players.length ? players.map((p) => `<button class="pl ${p.id === liveSel ? 'on' : ''}" data-id="${p.id}">${p.thumb ? `<img src="${p.thumb}" alt="">` : '<img alt="">'}<div class="grow"><div class="nm"><span class="dot"></span>${esc(p.name)}</div><div class="mute">${esc(p.state.screen || '?')}${p.state.score ? ' · ' + fmt(p.state.score) + ' pts' : ''}</div></div></button>`).join('') : '<div class="empty">Nobody is playing right now.<br>Players show up here while the game is open and signed in.</div>');
-    $('#lvList').querySelectorAll('.pl').forEach((b) => b.onclick = () => { liveSel = +b.dataset.id; liveAll = false; draw(); });
-    const v = $('#lvView'), p = players.find((x) => x.id === liveSel);
+    const arr = [...players.values()];
+    $('#lvList').innerHTML = '<h3>Online now <span class="badge">' + arr.length + '</span> <span class="mute" style="font-weight:500">' + esc(status) + '</span></h3>' + (arr.length ? arr.map((p) => `<button class="pl ${p.id === liveSel ? 'on' : ''}" data-id="${p.id}"><div class="av">${esc(p.name[0].toUpperCase())}</div><div class="grow"><div class="nm"><span class="dot"></span>${esc(p.name)}</div><div class="mute">${esc(p.state.screen || '?')}${p.state.score ? ' · ' + fmt(p.state.score) + ' pts' : ''}</div></div></button>`).join('') : '<div class="empty">Nobody is playing right now.<br>Players show up here the moment they open the game while signed in.</div>');
+    $('#lvList').querySelectorAll('.pl').forEach((b) => b.onclick = () => select(+b.dataset.id));
+  };
+  const info = (p) => `<div><small>Screen</small>${esc(p.state.screen || '?')}</div><div><small>Score</small>${fmt(p.state.score)}</div><div><small>Level</small>${p.state.level || '—'}</div><div><small>Rank</small>${p.state.rank || '—'}</div><div><small>Gold</small>${fmt(p.state.gold)}</div><div><small>Active pranks</small>${(p.state.effects || []).join(', ') || 'none'}</div>`;
+  const view = () => {
+    const v = $('#lvView'); if (!v) return; const p = players.get(liveSel);
     if (!p && !liveAll) { v.innerHTML = '<div class="empty">Pick a player on the left.</div>'; return; }
-    const head = liveAll ? `<h3>Everyone online (${players.length})</h3>` : `<h3>${esc(p.name)} <a class="link mute" onclick="go('#/players/${p.id}')">open profile</a></h3>`;
-    const view = liveAll ? '' : `<div class="screen">${p.thumb ? `<img src="${p.thumb}" alt="Their screen">` : '<div class="empty">No snapshot yet</div>'}<div class="kv"><div><small>Screen</small>${esc(p.state.screen || '?')}</div><div><small>Score</small>${fmt(p.state.score)}</div><div><small>Level</small>${p.state.level || '—'}</div><div><small>Rank</small>${p.state.rank || '—'}</div><div><small>Gold</small>${fmt(p.state.gold)}</div><div><small>Active pranks</small>${(p.state.effects || []).join(', ') || 'none'}</div></div></div>`;
-    v.innerHTML = head + `<div class="tgt"><button class="chip ${liveAll ? 'on' : ''}" id="allBtn">🎉 Prank everyone online</button></div>` + view + `<div class="pranks">${PRANKS.map((q) => `<button class="btn" data-k="${q[0]}"><span>${q[1]}</span>${q[2]}<small>${q[3]}</small></button>`).join('')}</div>`;
-    $('#allBtn').onclick = () => { liveAll = !liveAll; if (liveAll) liveSel = null; draw(); };
+    const head = liveAll ? `<h3>Everyone online (${players.size})</h3>` : `<h3>${esc(p.name)} <span class="badge" id="lvLive">LIVE</span> <a class="link mute" onclick="go('#/players/${p.id}')">open profile</a></h3>`;
+    const body = liveAll ? '' : `<div class="screen"><img id="lvImg" alt="Live screen"><div class="kv" id="lvInfo">${info(p)}</div></div>`;
+    v.innerHTML = head + `<div class="tgt"><button class="chip ${liveAll ? 'on' : ''}" id="allBtn">🎉 Prank everyone online</button></div>` + body + `<div class="pranks">${PRANKS.map((q) => `<button class="btn" data-k="${q[0]}"><span>${q[1]}</span>${q[2]}<small>${q[3]}</small></button>`).join('')}</div>`;
+    const img = $('#lvImg'); if (img && p.frame) img.src = p.frame;
+    $('#allBtn').onclick = () => { liveAll = !liveAll; if (liveAll) select(0); else view(); };
     v.querySelectorAll('.pranks .btn').forEach((b) => b.onclick = async () => {
-      const q = PRANKS.find((x) => x[0] === b.dataset.k), body = { id: liveAll ? 'all' : liveSel, type: q[0], secs: q[4] };
-      if (q[0] === 'message') { const r = await dialog({ title: 'Send a pop-up', fields: [{ label: 'Title (40 max)', value: 'Hello!' }, { label: 'Message (140 max)', value: 'I can see you...' }], ok: 'Send it' }); if (!r) return; body.text = r[0]; body.text2 = r[1]; }
-      if (q[0] === 'toast') { const r = await dialog({ title: 'Fake achievement', fields: [{ label: 'Title', value: 'Achievement unlocked!' }, { label: 'Subtitle', value: 'Stared at the screen' }], ok: 'Send it' }); if (!r) return; body.text = r[0]; body.text2 = r[1]; }
-      api('POST', 'prank', body).then((j) => toast('Sent to ' + j.sent + (j.sent === 1 ? ' player 😈' : ' players 😈'))).catch(fail);
+      const q = PRANKS.find((x) => x[0] === b.dataset.k), msg = { t: 'prank', id: liveAll ? 'all' : liveSel, type: q[0], secs: q[4] };
+      if (q[0] === 'message') { const r = await dialog({ title: 'Send a pop-up', fields: [{ label: 'Title (40 max)', value: 'Hello!' }, { label: 'Message (140 max)', value: 'I can see you...' }], ok: 'Send it' }); if (!r) return; msg.text = r[0]; msg.text2 = r[1]; }
+      if (q[0] === 'toast') { const r = await dialog({ title: 'Fake achievement', fields: [{ label: 'Title', value: 'Achievement unlocked!' }, { label: 'Subtitle', value: 'Stared at the screen' }], ok: 'Send it' }); if (!r) return; msg.text = r[0]; msg.text2 = r[1]; }
+      if (liveWS && liveWS.readyState === 1) liveWS.send(JSON.stringify(msg)); else toast('Not connected');
     });
   };
-  const tick = async () => { try { players = (await api('GET', 'live')).players; if ($('#dlgWrap').classList.contains('hidden')) draw(); } catch (e) { clearInterval(liveTimer); fail(e); } };
-  await tick(); liveTimer = setInterval(tick, 2000);
+  const select = (id) => { liveSel = id; if (id) liveAll = false; if (liveWS && liveWS.readyState === 1) liveWS.send(JSON.stringify({ t: 'watch', id })); list(); view(); };
+  const open = () => {
+    if (liveClosing) return;
+    const ws = liveWS = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/api/admin/ws', [KEY]);
+    ws.onopen = () => { status = 'live'; list(); if (liveSel) ws.send(JSON.stringify({ t: 'watch', id: liveSel })); };
+    ws.onmessage = (ev) => {
+      let d; try { d = JSON.parse(ev.data); } catch (e) { return; }
+      if (d.t === 'list') { players.clear(); d.players.forEach((p) => players.set(p.id, p)); list(); view(); }
+      else if (d.t === 'join') { players.set(d.id, d); list(); }
+      else if (d.t === 'leave') { players.delete(d.id); if (liveSel === d.id) liveSel = null; list(); view(); }
+      else if (d.t === 'state') { const p = players.get(d.id) || { id: d.id, name: d.name }; p.state = d.state; players.set(d.id, p); const el = $('#lvInfo'); if (d.id === liveSel && el) el.innerHTML = info(p); list(); }
+      else if (d.t === 'frame') { const p = players.get(d.id); if (p) p.frame = d.d; const img = $('#lvImg'); if (d.id === liveSel && img) img.src = d.d; }
+      else if (d.t === 'sent') toast(d.n ? 'Sent to ' + d.n + (d.n === 1 ? ' player 😈' : ' players 😈') : 'Nobody is online');
+    };
+    ws.onclose = () => { if (liveClosing) return; status = 'reconnecting…'; players.clear(); list(); setTimeout(open, 1500); };
+  };
+  liveClosing = false; open();
 }
 
 // ---- Leaderboard

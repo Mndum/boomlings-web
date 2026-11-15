@@ -1,7 +1,7 @@
 // Admin API for the /admin/ site. Every call needs the ADMIN_KEY secret in the X-Admin-Key header.
 import { J, bad, eq, hashPw, b64, NAME_RE, now, body, sha256, hex } from './worker.js';
 
-const adminOk = async (req, env) => {
+export const adminOk = async (req, env) => {
   const t = req.headers.get('x-admin-token') || '';
   return t.length === 64 && !!(await env.DB.prepare('SELECT 1 FROM admin_sessions WHERE token_hash = ? AND expires_at > ?').bind(await sha256(t), now()).first());
 };

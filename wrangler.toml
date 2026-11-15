@@ -14,6 +14,15 @@ binding = "DB"
 database_name = "boomlings-private-server"
 database_id = "1f610573-6219-4be5-a04b-39439231cd6b"
 
+# the live room (real-time view + instant pranks)
+[[durable_objects.bindings]]
+name = "HUB"
+class_name = "Hub"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Hub"]
+
 [vars]
 REF_REWARD_NEW = "100"     # gold for the player who enters a code
 REF_REWARD_OWNER = "100"   # gold for the code's owner

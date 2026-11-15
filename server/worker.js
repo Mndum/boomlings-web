@@ -2,7 +2,7 @@
 // One Cloudflare Worker + one D1 database. The game's static files are served by the [assets] binding; only /api/* gets here.
 // This is our own small JSON API (not the original game's server protocol).
 
-import { adminHandler } from './admin.js';
+import { adminHandler, adminOk } from './admin.js';
 
 const enc = new TextEncoder();
 export const J = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
@@ -35,7 +35,7 @@ export async function body(req, max = 300000) {
 
 async function auth(req, env) {
   const h = req.headers.get('authorization') || '';
-  const tok = h.startsWith('Bearer ') ? h.slice(7) : '';
+  const tok = h.startsWith('Bearer ') ? h.slice(7) : (req.headers.get('upgrade') === 'websocket' ? req.headers.get('sec-websocket-protocol') || '' : '');   // browsers cannot set headers on a WebSocket: the token rides in the subprotocol
   if (!tok) return null;
   return env.DB.prepare('SELECT u.* FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ? AND u.banned = 0').bind(await sha256(tok), now()).first();
 }
@@ -202,9 +202,28 @@ async function redeem(env, userId, codeRaw) {
   return { ok: true, reward: gNew };
 }
 
+export { Hub } from './hub.js';
+
+// live room (Durable Object): players and the admin site connect here by WebSocket
+async function liveSocket(req, env, url) {
+  if (req.headers.get('upgrade') !== 'websocket') return bad('Expected a WebSocket', 426);
+  const hub = env.HUB.get(env.HUB.idFromName('main'));
+  const h = new Headers(req.headers);
+  if (url.pathname === '/api/admin/ws') {
+    if (!(await adminOk({ headers: new Headers({ 'x-admin-token': req.headers.get('sec-websocket-protocol') || '' }) }, env))) return bad('Please sign in', 401);
+    h.set('x-role', 'admin');
+  } else {
+    const u = await auth(req, env);
+    if (!u) return bad('Please sign in', 401);
+    h.set('x-role', 'player'); h.set('x-uid', String(u.id)); h.set('x-name', u.name);
+  }
+  return hub.fetch(new Request(req, { headers: h }));
+}
+
 export default {
   async fetch(req, env) {
     const url = new URL(req.url), key = req.method + ' ' + url.pathname;
+    if (url.pathname === '/api/ws' || url.pathname === '/api/admin/ws') return liveSocket(req, env, url);
     if (url.pathname.startsWith('/api/admin/')) return adminHandler(req, env, url);
     const fn = routes[key];
     if (!fn) return bad('Not found', 404);
