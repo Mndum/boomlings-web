@@ -1,5 +1,6 @@
 // Admin API for the /admin/ site. Every call needs the ADMIN_KEY secret in the X-Admin-Key header.
 import { J, bad, eq, hashPw, b64, NAME_RE, now, body, sha256, hex } from './worker.js';
+import { cheatRoutes } from './cheat.js';
 
 export const adminOk = async (req, env) => {
   const t = req.headers.get('x-admin-token') || '';
@@ -149,7 +150,7 @@ const admin = {
         await editSaveGold(env, id, () => 0);
         await pokeClaim(env, id);
         await logAct(env, 'set coins to 0', u, 'live if they are online, otherwise when they next open the game'); break;
-      case 'resetIap': await env.DB.prepare('UPDATE users SET last_iap = 0 WHERE id = ?').bind(id).run(); await logAct(env, 'reset free-gold timer', u); break;
+      case 'resetIap': await env.DB.prepare('UPDATE users SET last_iap = 0, iap_cd = 0 WHERE id = ?').bind(id).run(); await logAct(env, 'reset free-gold timer', u); break;
       case 'rename': {
         const nm = String(b.name || '').trim();
         if (!NAME_RE.test(nm)) return bad('Name must be 3-12 letters, numbers, space, _ or -');
@@ -169,13 +170,15 @@ const admin = {
       case 'delete':
         await env.DB.batch([
           env.DB.prepare('UPDATE users SET referred_by = NULL WHERE referred_by = ?').bind(id), env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(id), env.DB.prepare('DELETE FROM live WHERE user_id = ?').bind(id), env.DB.prepare('DELETE FROM pranks WHERE user_id = ?').bind(id),
-          env.DB.prepare('DELETE FROM saves WHERE user_id = ?').bind(id), env.DB.prepare('DELETE FROM scores WHERE user_id = ?').bind(id), env.DB.prepare('DELETE FROM users WHERE id = ?').bind(id)]);
+          env.DB.prepare('DELETE FROM saves WHERE user_id = ?').bind(id), env.DB.prepare('DELETE FROM scores WHERE user_id = ?').bind(id), env.DB.prepare('DELETE FROM cheat_flags WHERE user_id = ?').bind(id), env.DB.prepare('DELETE FROM cheat_state WHERE user_id = ?').bind(id), env.DB.prepare('DELETE FROM users WHERE id = ?').bind(id)]);
         await logAct(env, 'delete account', u); break;
       default: return bad('Unknown action');
     }
     return J({ ok: true });
   },
 };
+
+Object.assign(admin, cheatRoutes);
 
 export async function adminHandler(req, env, url) {
   const path = url.pathname.slice('/api/admin/'.length);

@@ -408,14 +408,14 @@ export class ShopScreen extends Screen {
       const own = save.hasIcon(ic.id), a2 = ic.unlockedBy && this.G.ach.byId[ic.unlockedBy];
       out.push({ kind: 'icon', id: ic.id, boom: ic.index, title: ic.title, desc: ic.desc.split(nl).join(' '), price: ic.price, owned: own, selected: d.icon === ic.id, locked: !own && ic.unlockedBy ? 'Unlocked by <cy>' + (a2 ? a2.title : 'achievement') + '</c>' : null, buy: () => this.buy(ic.title, ic.price, () => store.buyIcon(ic)) });
     }
-    else if (this.tab === 'iap' && this.G.api && this.G.api.online && this.G.api.packs) Object.entries(this.G.api.packs).forEach(([pack, gold], i) => out.push({ kind: 'iap', title: fmt(gold) + ' Gold', desc: 'A pile of <cy>Gold Coins</c> for the Store. <cg>Free</c>, one pack every <cy>3 days</c>.', art: 'IAPGold0' + (i + 1) + '_001.png', price: 0, owned: false, buy: () => this.getPack(pack, gold) }));
+    else if (this.tab === 'iap' && this.G.api && this.G.api.online && this.G.api.packs) Object.entries(this.G.api.packs).forEach(([pack, gold], i) => out.push({ kind: 'iap', title: fmt(gold) + ' Gold', desc: 'A pile of <cy>Gold Coins</c> for the Store. <cg>Free</c>, one pack every <cy>' + this.G.api.packDays(pack) + ' days</c>.', art: 'IAPGold0' + (i + 1) + '_001.png', price: 0, owned: false, buy: () => this.getPack(pack, gold) }));
     return out;
   }
   getPack(pack, gold) {
     const api = this.G.api;
     if (!api.signedIn) { this.app.account(); return; }
     const w = api.iapWait();
-    if (w > 0) { this.app.dialog('Come back later', 'You can claim free gold <cy>once every 3 days</c>. Next pack in <cg>' + (w >= 86400 ? Math.floor(w / 86400) + ' d ' + Math.floor((w % 86400) / 3600) + ' h' : Math.floor(w / 3600) + ' h ' + Math.ceil((w % 3600) / 60) + ' min') + '</c>.', [['OK', null]]); return; }
+    if (w > 0) { this.app.dialog('Come back later', 'You can claim free gold <cy>once every ' + Math.round((api.user.iapCd || api.cooldown || 259200) / 86400) + ' days</c>. Next pack in <cg>' + (w >= 86400 ? Math.floor(w / 86400) + ' d ' + Math.floor((w % 86400) / 3600) + ' h' : Math.floor(w / 3600) + ' h ' + Math.ceil((w % 3600) / 60) + ' min') + '</c>.', [['OK', null]]); return; }
     api.buyPack(pack).then((g) => this.app.dialog('Gold Reward!', 'You have been rewarded <cg>' + fmt(g) + '</c> <cy>Gold Coins</c>!', [['OK', null]])).catch((e) => this.app.dialog('Error', e.message, [['OK', null]]));
   }
   setTab(t) {
@@ -495,7 +495,7 @@ export class ShopScreen extends Screen {
     if (e.kind !== 'icon' && !e.owned && e.price > this.G.save.gold) { const fg = ui.has('freeBtn_001.png') ? 'freeBtn_001.png' : null; if (fg) { ui.draw(ctx, fg, X(500), 189); if (hit) this.hits.add(440, 130, 120, 110, () => { if (this.G.store.claimOffline('offers', 600000)) this.G.save.addGold(25); else this.app.dialog('Unavailable', 'No offers right now. Check back in 10 minutes!', [['OK', null]]); }); } }
     // price / state + button
     if (e.kind === 'icon' && e.owned) this.btnLabel(ctx, e.selected ? 'Selected' : 'Select', X(320), 413, e.selected ? 213 : 187, hit && !e.selected ? () => { this.G.save.d.icon = e.id; this.G.save.flush(); } : null, e.selected);
-    else if (e.kind === 'iap') { f.gold.draw(ctx, 'FREE', 320, 362, { scale: 0.95 }); { const w = this.G.api.signedIn ? this.G.api.iapWait() : 0, hrs = Math.floor(w / 3600), lab = !this.G.api.signedIn ? 'Sign in' : w > 0 ? (w >= 86400 ? Math.floor(w / 86400) + 'd ' + Math.floor((w % 86400) / 3600) + 'h' : hrs ? hrs + 'h ' + Math.ceil((w % 3600) / 60) + 'm' : Math.ceil(w / 60) + ' min') : 'Get Gold'; this.btnLabel(ctx, lab, X(320), 418.4, 213, hit ? () => e.buy() : null, w > 0); } }
+    else if (e.kind === 'iap') { f.gold.draw(ctx, 'FREE', 320, 191, { scale: 0.8 }); { const w = this.G.api.signedIn ? this.G.api.iapWait() : 0, hrs = Math.floor(w / 3600), lab = !this.G.api.signedIn ? 'Sign in' : w > 0 ? (w >= 86400 ? Math.floor(w / 86400) + 'd ' + Math.floor((w % 86400) / 3600) + 'h' : hrs ? hrs + 'h ' + Math.ceil((w % 3600) / 60) + 'm' : Math.ceil(w / 60) + ' min') : 'Get Gold'; this.btnLabel(ctx, lab, X(320), 418.4, 213, hit ? () => e.buy() : null, w > 0); } }
     else if (e.owned) this.btnLabel(ctx, e.kind === 'pow' ? 'Maxed' : 'Owned', X(320), 413, 187, null, true);
     else if (e.locked) richText(ctx, f.chat, e.locked, X(320), 395, { scale: 1.0, maxWidth: 420, align: 'center', lineHeight: 40 });
     else {

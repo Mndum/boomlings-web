@@ -155,6 +155,7 @@
     <a href="#/live" data-t="live"><span class="ic">🎭</span>Live &amp; Pranks</a>
     <a href="#/leaderboard" data-t="leaderboard"><span class="ic">🏆</span>Leaderboard</a>
     <a href="#/ratings" data-t="ratings"><span class="ic">⭐</span>Reviews</a>
+    <a href="#/cheats" data-t="cheats"><span class="ic">🚨</span>Cheats<span class="badge bad hidden" id="cheatBadge" style="margin-left:auto">0</span></a>
     <a href="#/log" data-t="log"><span class="ic">📋</span>Activity</a>
     <div class="grow"></div>
     <button class="out" id="signOut">Sign out</button>
@@ -228,7 +229,7 @@ const avatar = (name, id, cls = '') => icon(id, cls) || `<div class="av">${esc(S
 async function enter() {
   { const p = loadIcons(); ICONS = p; p.then((v) => { p.v = v; }); await p.catch(() => {}); }
   try { await api('GET', 'stats'); } catch (e) { $('#loginErr').textContent = KEY ? e.message : ''; return false; }
-  $('#login').classList.add('hidden'); $('#app').classList.remove('hidden'); route(); return true;
+  $('#login').classList.add('hidden'); $('#app').classList.remove('hidden'); route(); cheatBadge(); return true;
 }
 function signOut() { if (typeof liveStop === 'function') liveStop(); if (KEY) fetch('/api/admin/logout', { method: 'POST', headers: { 'x-admin-token': KEY } }).catch(() => {}); KEY = ''; sessionStorage.removeItem('adminToken'); $('#app').classList.add('hidden'); $('#login').classList.remove('hidden'); closeSheet(); }
 $('#loginForm').onsubmit = async (e) => {
@@ -246,7 +247,7 @@ function route() {
   const [, tab = 'overview', id] = location.hash.split('/');
   document.querySelectorAll('nav a').forEach((a) => a.classList.toggle('on', a.dataset.t === tab));
   liveStop();
-  ({ overview, players, live, leaderboard, ratings, log: logView }[tab] || overview)();
+  ({ overview, players, live, leaderboard, ratings, cheats, log: logView }[tab] || overview)();
   if (tab === 'players' && id) openPlayer(+id); else closeSheet(true);
 }
 window.addEventListener('hashchange', route);
@@ -434,6 +435,58 @@ async function ratings() {
     $('#rv').querySelectorAll('button[data-id]').forEach((b) => b.onclick = async () => { if (await dialog({ title: 'Delete this review?', ok: 'Delete', danger: true })) api('POST', 'deleteRating', { id: +b.dataset.id }).then(() => { toast('Deleted'); ratings(); }).catch(fail); });
   } catch (e) { fail(e); }
 }
+
+// ---- Cheat reports: found by the server's checks or reported by the game itself (see server/cheat.js). Newest and most serious first.
+const CHEAT_KINDS = {
+  gold_jump: ['Gold appeared from nowhere', 'Their gold rose by more than games, gifts and free offers can explain.'],
+  gold_edit: ['Gold edited in the game', 'The game saw the coin counter change without a reward (console, trainer or extension).'],
+  save_edited: ['Save file edited', 'The save file was changed while the game was closed.'],
+  invalid_values: ['Impossible values', 'The save contains numbers the game can never produce.'],
+  rank_jump: ['Rank jumped', 'Rank rose by 3 or more without playing games.'],
+  best_edit: ['Best score edited', 'Best score went up without finishing a game.'],
+  score_implausible: ['Impossible score', 'A leaderboard score higher than the game can give at that level.'],
+  too_fast: ['Level speed run', 'Reached a high level much faster than the game allows.'],
+  inhuman_speed: ['Inhuman speed', 'More moves per second than a person can make (a bot or macro).'],
+  time_anomaly: ['Clock speed-up', 'The system clock ran faster or slower than the game timer (speed hack).']
+};
+const SEV = { 3: ['Almost certain', 'bad'], 2: ['Likely', ''], 1: ['Suspicious', ''] };
+let cheatShowAll = false;
+async function cheats() {
+  const m = $('#main');
+  m.innerHTML = `<h2>Cheat reports</h2><p class="sub">Players the cheat detector flagged. Open ones first, most serious on top. Check the details before banning: a flag is a strong hint, not a verdict.</p>
+    <div class="tgt"><button class="chip ${cheatShowAll ? '' : 'on'}" id="chOpen">Open</button><button class="chip ${cheatShowAll ? 'on' : ''}" id="chAll">All</button><button class="chip" id="chDone">Mark all reviewed</button></div>
+    <div class="card" id="chList"><div class="empty">Loading…</div></div>`;
+  $('#chOpen').onclick = () => { cheatShowAll = false; cheats(); };
+  $('#chAll').onclick = () => { cheatShowAll = true; cheats(); };
+  $('#chDone').onclick = async () => { if (await dialog({ title: 'Mark everything reviewed?', text: 'This only hides the open reports; it does not ban or change anyone.', ok: 'Mark reviewed' })) { await api('POST', 'cheatResolve', { all: true }); cheats(); cheatBadge(); } };
+  try {
+    const { flags } = await api('GET', 'cheats' + (cheatShowAll ? '?all=1' : ''));
+    $('#chList').innerHTML = flags.length ? flags.map((f) => {
+      const k = CHEAT_KINDS[f.kind] || [f.kind, ''], sv = SEV[f.severity] || SEV[1];
+      return `<div class="row" style="align-items:flex-start;${f.resolved ? 'opacity:.55' : ''}"><div class="grow"><div class="nm"><a class="link" onclick="go('#/players/${f.user_id}')">${esc(f.name)}</a> — ${esc(k[0])} <span class="badge ${sv[1]}">${sv[0]}</span>${f.count > 1 ? ` <span class="badge">×${f.count}</span>` : ''}${f.banned ? ' <span class="badge bad">banned</span>' : ''}</div>
+        <div class="mute">${esc(f.detail || k[1])}</div><div class="mute" title="${when(f.at)}">${f.source === 'game' ? 'Reported by the game' : 'Found by the server'} · ${ago(f.at)}</div></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">${f.resolved ? `<button class="btn" data-re="${f.id}">Reopen</button>` : `<button class="btn" data-ok="${f.id}">Dismiss</button>`}${f.banned ? '' : `<button class="btn danger" data-ban="${f.user_id}" data-n="${esc(f.name)}">Ban</button>`}</div></div>`;
+    }).join('') : '<div class="empty">No cheat reports. Everyone is playing fair 🎉</div>';
+    $('#chList').querySelectorAll('[data-ok]').forEach((b) => b.onclick = async () => { await api('POST', 'cheatResolve', { id: +b.dataset.ok }); cheats(); cheatBadge(); });
+    $('#chList').querySelectorAll('[data-re]').forEach((b) => b.onclick = async () => { await api('POST', 'cheatResolve', { id: +b.dataset.re, resolved: 0 }); cheats(); cheatBadge(); });
+    $('#chList').querySelectorAll('[data-ban]').forEach((b) => b.onclick = async () => {
+      const r = await dialog({ title: 'Ban ' + b.dataset.n + '?', text: 'They are signed out and hidden from the leaderboard.', fields: [{ label: 'Reason (shown to them)', value: 'Cheating' }], ok: 'Ban', danger: true });
+      if (!r) return; await api('POST', 'action', { id: +b.dataset.ban, action: 'ban', reason: r[0] }); toast(b.dataset.n + ' banned'); cheats();
+    });
+  } catch (e) { fail(e); }
+}
+// red number on the Cheats tab; a toast when a new report arrives while the admin site is open
+let cheatSeen = null;
+async function cheatBadge() {
+  if (!KEY) return;
+  try {
+    const { open } = await api('GET', 'cheats?count=1'), el = $('#cheatBadge');
+    if (el) { el.textContent = open; el.classList.toggle('hidden', !open); }
+    if (cheatSeen !== null && open > cheatSeen) toast('🚨 New cheat report');
+    cheatSeen = open;
+  } catch (e) { /* signed out or offline */ }
+}
+setInterval(cheatBadge, 20000);
 
 // ---- Activity log
 async function logView() {

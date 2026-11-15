@@ -3,6 +3,7 @@
 // This is our own small JSON API (not the original game's server protocol).
 
 import { adminHandler, adminOk } from './admin.js';
+import { checkSave, checkScore, clientReport } from './cheat.js';
 
 const enc = new TextEncoder();
 export const J = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
@@ -46,8 +47,11 @@ async function newSession(env, userId) {
   return tok;
 }
 
-const profile = (u, extra = {}) => ({ id: u.id, name: u.name, refCode: u.ref_code, pendingGold: Math.max(0, u.earned_gold - u.claimed_gold), lastIap: u.last_iap || 0, discord: !!u.discord_id, ...extra });
+const profile = (u, extra = {}) => ({ id: u.id, name: u.name, refCode: u.ref_code, pendingGold: Math.max(0, u.earned_gold - u.claimed_gold), lastIap: u.last_iap || 0, iapCd: u.iap_cd || 0, discord: !!u.discord_id, ...extra });
 const iapCooldown = (env) => Math.round((+env.IAP_COOLDOWN_DAYS || 3) * 86400);
+// the biggest pack (20,000 gold) keeps the next free pack away for 2 weeks; the others use the normal cooldown
+const IAP_LONG = { gold_5: 14 * 86400 };
+const packCooldown = (env, pack) => IAP_LONG[pack] || iapCooldown(env);
 const remain = (s) => { const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.ceil((s % 3600) / 60); return d ? d + ' day' + (d > 1 ? 's' : '') + (h ? ' ' + h + ' h' : '') : h ? h + ' h ' + m + ' min' : m + ' min'; };
 
 // hand over everything the user has earned and not yet received (atomic: only one request can win a given amount)
@@ -117,16 +121,19 @@ const routes = {
     if (cur && !force && cur.updated_at > (base || 0)) return J({ conflict: true, data: cur.data, updatedAt: cur.updated_at }, 409);
     const t = now();
     await env.DB.prepare('INSERT INTO saves (user_id, data, updated_at) VALUES (?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at').bind(u.id, data, t).run();
+    await checkSave(env, u, data);   // cheat detector: compare with the previous upload
     return J({ ok: true, updatedAt: t });
   },
+  async 'POST /api/cheat'(req, env, u) { return clientReport(req, env, u, body); },   // the game reports tampering it notices
 
   // ---- leaderboards
   async 'POST /api/score'(req, env, u) {
-    const { score, level, icon, rank } = await body(req, 2000);
+    const { score, level, icon, rank, start, secs, moves } = await body(req, 2000);
     const sc = Math.floor(+score), lv = Math.floor(+level);
     if (!(sc >= 0 && sc <= 1e9) || !(lv >= 0 && lv <= 10000)) return bad('Invalid score');
     const rk = Math.min(60, Math.max(1, Math.floor(+rank) || 1)), ic = typeof icon === 'string' && /^kIcon_\d{3}$/.test(icon) ? icon : null;
     await env.DB.prepare('INSERT INTO scores (user_id, best_score, best_level, icon, rank, updated_at) VALUES (?1, ?2, ?3, ?4, ?6, ?5) ON CONFLICT(user_id) DO UPDATE SET best_score = MAX(best_score, ?2), best_level = MAX(best_level, ?3), icon = COALESCE(?4, icon), rank = ?6, updated_at = ?5').bind(u.id, sc, lv, ic, now(), rk).run();
+    await checkScore(env, u, { score: sc, level: lv, start: Math.floor(+start) || 1, secs: +secs || 0, moves: Math.floor(+moves) || 0 });
     return J({ ok: true });
   },
   // ordered like the game's own local list: highest level first, then score
@@ -255,19 +262,19 @@ const routes = {
   },
 
   // ---- free in-app purchases: every pack is granted at no cost (our own packs, see IAP_PACKS)
-  async 'GET /api/iap'(req, env) { return J({ packs: IAP_PACKS, cooldown: iapCooldown(env), discord: discordOn(env) }); },
+  async 'GET /api/iap'(req, env) { return J({ packs: IAP_PACKS, cooldown: iapCooldown(env), cooldowns: Object.fromEntries(Object.keys(IAP_PACKS).map((k) => [k, packCooldown(env, k)])), discord: discordOn(env) }); },
   async 'POST /api/iap'(req, env, u) {
     const { pack } = await body(req, 500);
     const g = IAP_PACKS[pack];
     if (!g) return bad('Unknown pack');
-    // one free pack per account per cooldown (3 days); the condition makes it atomic, so two quick taps cannot both win
-    const t = now(), cd = iapCooldown(env);
-    const r = await env.DB.prepare('UPDATE users SET last_iap = ?, earned_gold = earned_gold + ? WHERE id = ? AND last_iap <= ?').bind(t, g, u.id, t - cd).run();
+    // one free pack per account per cooldown (3 days, or 14 days after the 20,000 pack); the condition makes it atomic, so two quick taps cannot both win
+    const t = now(), base = iapCooldown(env), cd = packCooldown(env, pack);
+    const r = await env.DB.prepare('UPDATE users SET last_iap = ?1, iap_cd = ?2, earned_gold = earned_gold + ?3 WHERE id = ?4 AND last_iap + CASE WHEN iap_cd > 0 THEN iap_cd ELSE ?5 END <= ?1').bind(t, cd, g, u.id, base).run();
     if (r.meta.changes !== 1) {
-      const row = await env.DB.prepare('SELECT last_iap FROM users WHERE id = ?').bind(u.id).first(), left = row.last_iap + cd - t;
-      return J({ error: 'You can claim free gold again in ' + remain(Math.max(60, left)) + '.', lastIap: row.last_iap, wait: left }, 429);
+      const row = await env.DB.prepare('SELECT last_iap, iap_cd FROM users WHERE id = ?').bind(u.id).first(), left = row.last_iap + (row.iap_cd || base) - t;
+      return J({ error: 'You can claim free gold again in ' + remain(Math.max(60, left)) + '.', lastIap: row.last_iap, iapCd: row.iap_cd || 0, wait: left }, 429);
     }
-    return J({ ok: true, lastIap: t, ...(await claimAll(env, u.id)) });
+    return J({ ok: true, lastIap: t, iapCd: cd, ...(await claimAll(env, u.id)) });
   },
 };
 

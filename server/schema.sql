@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS users (
   take_gold   INTEGER NOT NULL DEFAULT 0,  -- coins an admin took away, removed from the player's save when they next connect
   wipe_gold   INTEGER NOT NULL DEFAULT 0,  -- 1 = admin set their coins to 0
   last_iap    INTEGER NOT NULL DEFAULT 0,  -- when they last took a free gold pack
+  iap_cd      INTEGER NOT NULL DEFAULT 0,  -- how long that pack locks the next one (0 = the normal cooldown); the 20,000 pack locks it for 14 days
   banned      INTEGER NOT NULL DEFAULT 0,
   ban_reason  TEXT,
   discord_id  TEXT,                        -- linked Discord account (Discord login)
@@ -106,4 +107,30 @@ CREATE TABLE IF NOT EXISTS discord_states (
   status     TEXT,             -- NULL while waiting, then login / created / linked / error
   result_id  INTEGER,
   error      TEXT
+);
+
+-- cheat detector (server/cheat.js): one row per player and kind while unreviewed
+CREATE TABLE IF NOT EXISTS cheat_flags (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  at INTEGER NOT NULL,
+  kind TEXT NOT NULL,
+  severity INTEGER NOT NULL DEFAULT 1,     -- 1 suspicious, 2 likely, 3 almost certain
+  count INTEGER NOT NULL DEFAULT 1,
+  detail TEXT,
+  source TEXT NOT NULL DEFAULT 'server',   -- server = found by the server checks, game = reported by the game itself
+  resolved INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS cheat_flags_open ON cheat_flags(resolved, severity DESC, at DESC);
+CREATE INDEX IF NOT EXISTS cheat_flags_user ON cheat_flags(user_id, kind);
+-- what the last cloud-save upload looked like, to see what changed since
+CREATE TABLE IF NOT EXISTS cheat_state (
+  user_id INTEGER PRIMARY KEY,
+  t INTEGER NOT NULL,
+  gold INTEGER NOT NULL,
+  ksgold INTEGER NOT NULL,
+  games INTEGER NOT NULL,
+  rank INTEGER NOT NULL,
+  best INTEGER NOT NULL,
+  claimed INTEGER NOT NULL
 );

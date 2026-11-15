@@ -6,6 +6,7 @@ import { AudioMan } from './audio.js';
 import { loadImage } from './plist.js';
 import { PlayScene, SFX_ALL } from './game.js';
 import { Save } from './save.js';
+import { CheatGuard } from './cheat.js';
 import { Particles } from './particles.js';
 import { Store } from './store.js';
 import { Ach } from './ach.js';
@@ -206,7 +207,7 @@ async function boot() {
     G.lib = await AnimLibrary.load('assets/', obj); G.libXL = new AnimLibrary(G.lib.defs, G.lib.descs, menu); // xl_Block frames live in menuSheet
     G.fx = await Particles.load('assets/', await Atlas.load('assets/particleImgSheet'));
     G.store = await Store.load(save, ach); ach.store = G.store;
-    G.api = new Api(G); G.api.init().then(() => { G.pranks = new Pranks(G, app, canvas, W, CH); G.pranks.start(); });   // optional backend: stays offline when the site is not served with the Worker
+    G.api = new Api(G); G.cheat = new CheatGuard(G); G.cheat.start(); G.api.init().then(() => { G.pranks = new Pranks(G, app, canvas, W, CH); G.pranks.start(); });   // optional backend: stays offline when the site is not served with the Worker
     ach.onUnlock = (a) => app.toast('Achievement unlocked!', a.title, 'getAch001.ogg');
     ach.onIconUnlock = (ic) => app.toast('You unlocked ' + ic.title + '!', 'New icon', 'unlock004.ogg');
     G.audio.musicOn = save.d.opts.music; G.audio.enabled = save.d.opts.sfx; G.audio.haptics = save.d.opts.haptics !== false; G.audio.mv = save.d.opts.mv ?? 1; G.audio.sv = save.d.opts.sv ?? 1;
