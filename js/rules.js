@@ -51,10 +51,11 @@ export class Chances {
     const level = this.getLevel();
     if (a === ATTR.Bomb) return 10;
     if (a === ATTR.Color) return 4;
-    const cap = { 5: 6, 6: 6, 7: 4, 8: 10, 9: 1, 11: 6 }[a];
-    if (cap === undefined) return 0;
+    // measured from the running game (GamePieceManager::maxCountForAttr, levels 0-30): [first level, levels per extra piece, cap]
+    const t = { 5: [3, 4, 6], 6: [5, 3, 6], 7: [7, 3, 4], 8: [11, 2, 10], 9: [9, 1e9, 1], 11: [13, 2, 6] }[a];
+    if (!t) return 0;
     const l = Math.ceil(level);
-    return l > 0 ? Math.min(l, cap) : 0;
+    return l < t[0] ? 0 : Math.min(t[2], 1 + Math.floor((l - t[0]) / t[1]));
   }
   isAtMaxCount(a) { return this.counts(a) >= this.maxCountForAttr(a); }
   maxChanceForAttr(a) {
